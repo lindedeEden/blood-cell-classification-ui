@@ -1,0 +1,65 @@
+/**
+ * 血球分類軟體 - 共用樣式
+ */
+.status-capsule {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 9999px;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+/* 游標懸停時：膠囊變綠色＋打勾，內部字體不變 */
+.status-capsule:hover,
+.status-capsule.status-capsule-done {
+  background-color: #dcfce7 !important;
+  color: #166534 !important;
+}
+.status-capsule:hover::before,
+.status-capsule.status-capsule-done::before {
+  content: '\2713';
+  margin-right: 0.25rem;
+  font-weight: 700;
+}
+.bg-striped {
+  background-color: #f9fafb;
+  background-image: linear-gradient(
+    45deg,
+    #e5e7eb 25%,
+    transparent 25%,
+    transparent 50%,
+    #e5e7eb 50%,
+    #e5e7eb 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 10px 10px;
+}
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+.tr-selected {
+  background-color: #eef2ff !important;
+}
+@media (prefers-color-scheme: dark) {
+  .tr-selected {
+    background-color: rgba(79, 70, 229, 0.2) !important;
+  }
+}
+
+/* 檢體管理：三段式字體縮放（規格 T5） */
+body.font-size-small { font-size: 87.5%; }
+body.font-size-normal { font-size: 100%; }
+body.font-size-large { font-size: 112.5%; }
+
+/* 表頭可點擊排序 */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: #4F46E5; }
+th .sort-icon { opacity: 0.4; }
+th.sort-asc .sort-icon-asc,
+th.sort-desc .sort-icon-desc { opacity: 1; }

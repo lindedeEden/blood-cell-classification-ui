@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>檢體管理 - 血球型態分類軟體</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: "#4F46E5",
+            "background-light": "#F8FAFC",
+            "surface-light": "#FFFFFF",
+            "text-light": "#334155",
+            "text-muted-light": "#64748B",
+            "border-light": "#E2E8F0",
+            "danger-light": "#FEE2E2",
+            "danger-text-light": "#B91C1C",
+            "success-light": "#D1FAE5",
+            "success-text-light": "#059669",
+            "info-light": "#DBEAFE",
+            "info-text-light": "#2563EB",
+          },
+          fontFamily: { sans: ["Inter", "sans-serif"] },
+        },
+      },
+    };
+  </script>
+  <link rel="stylesheet" href="assets/css/common.css"/>
+</head>
+<body class="bg-background-light text-text-light text-sm font-size-normal" id="body-font-scale">
+  <div class="flex flex-col h-screen">
+    <header class="flex items-center justify-between p-2 border-b bg-surface-light border-border-light">
+      <div class="flex items-center space-x-4">
+        <h1 class="text-lg font-semibold text-text-light">Intelligent Morphology Review Platform</h1>
+        <div class="flex space-x-2 text-sm text-text-muted-light">
+          <a class="hover:text-primary" href="index.html">首頁</a>
+          <a class="hover:text-primary" href="#">檔案(F)</a>
+          <a class="hover:text-primary" href="#">工具(T)</a>
+          <a class="hover:text-primary" href="#">說明(H)</a>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button type="button" class="p-2 rounded hover:bg-gray-100" title="縮小字型" id="font-smaller"><span class="material-symbols-outlined text-base">remove</span></button>
+        <button type="button" class="p-2 rounded hover:bg-gray-100" title="放大字型" id="font-larger"><span class="material-symbols-outlined text-base">add</span></button>
+        <button type="button" class="p-2 rounded hover:bg-gray-100" title="系統設定"><span class="material-symbols-outlined">settings</span></button>
+        <button type="button" class="p-2 rounded hover:bg-gray-100" title="登出"><span class="material-symbols-outlined">power_settings_new</span></button>
+      </div>
+    </header>
+
+    <div class="flex flex-grow overflow-hidden">
+      <main class="flex-grow flex flex-col p-2 space-y-2">
+        <div class="flex flex-wrap items-center gap-4">
+          <div class="flex items-center space-x-2">
+            <div class="inline-flex rounded-md shadow-sm" role="group">
+              <button type="button" class="mode-tab px-4 py-2 text-sm font-medium border rounded-l-md" data-mode="digital" id="tab-digital">數位閱片</button>
+              <button type="button" class="mode-tab px-4 py-2 text-sm font-medium border border-border-light rounded-r-md hover:bg-gray-100" data-mode="entity" id="tab-entity">實體作業</button>
+            </div>
+            <button type="button" class="flex items-center space-x-1 p-2 rounded-md border border-border-light bg-surface-light text-text-muted-light hover:bg-gray-100" id="btn-filter" aria-expanded="false">
+              <span class="material-symbols-outlined text-base">filter_list</span>
+              <span>篩選</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="filter-panel" class="bg-surface-light p-3 rounded-md border border-border-light hidden">
+          <p class="text-xs font-medium text-text-muted-light mb-2">檢體狀態（勾選要顯示的狀態）</p>
+          <div class="flex flex-wrap gap-4">
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="PLT Check"/> <span class="ml-1 text-xs">PLT Check</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="AI Alert"/> <span class="ml-1 text-xs">AI Alert</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Follow-up"/> <span class="ml-1 text-xs">Follow-up</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Digital Review"/> <span class="ml-1 text-xs">Digital Review</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Verified"/> <span class="ml-1 text-xs">Verified</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Locked"/> <span class="ml-1 text-xs">Locked</span></label>
+          </div>
+        </div>
+
+        <div class="bg-surface-light p-2 rounded-md border border-border-light">
+          <div class="flex items-end flex-wrap gap-2">
+            <div class="flex-1 min-w-[120px]">
+              <label class="block text-xs font-medium text-text-muted-light" for="analysis-date-start">檢驗日期</label>
+              <div class="flex items-center mt-1 gap-1">
+                <input class="w-full text-xs p-1.5 rounded-md border border-border-light bg-background-light focus:ring-primary focus:border-primary" id="analysis-date-start" type="date" value="2025-08-07"/>
+                <span>-</span>
+                <input class="w-full text-xs p-1.5 rounded-md border border-border-light bg-background-light focus:ring-primary focus:border-primary" id="analysis-date-end" type="date" value="2025-08-07"/>
+              </div>
+            </div>
+            <div class="flex-1 min-w-[100px]">
+              <label class="block text-xs font-medium text-text-muted-light" for="filter-department">送檢單位</label>
+              <select class="mt-1 block w-full text-xs p-1.5 rounded-md border border-border-light bg-background-light focus:ring-primary focus:border-primary" id="filter-department">
+                <option value="">所有單位</option>
+              </select>
+            </div>
+            <div class="flex-1 min-w-[80px]">
+              <label class="block text-xs font-medium text-text-muted-light" for="filter-machine">機台</label>
+              <select class="mt-1 block w-full text-xs p-1.5 rounded-md border border-border-light bg-background-light focus:ring-primary focus:border-primary" id="filter-machine">
+                <option value="">所有機台</option>
+              </select>
+            </div>
+            <div class="flex-1 min-w-[120px]">
+              <label class="block text-xs font-medium text-text-muted-light" for="specimen-search">檢體搜尋</label>
+              <input class="mt-1 block w-full text-xs p-1.5 rounded-md border border-border-light bg-background-light focus:ring-primary focus:border-primary" id="specimen-search" placeholder="檢體 ID 或 病歷號" type="text"/>
+            </div>
+            <div class="flex items-center space-x-2 flex-wrap">
+              <button type="button" class="px-4 py-1.5 bg-primary text-white rounded-md text-xs hover:bg-primary/90" id="btn-search">搜尋</button>
+              <label class="inline-flex items-center">
+                <input class="rounded border-gray-300 text-primary shadow-sm focus:ring-primary" type="checkbox" id="exact-match"/>
+                <span class="ml-1 text-xs">僅顯示完全相符項</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex-grow overflow-auto bg-surface-light rounded-md border border-border-light">
+          <table class="w-full text-left">
+            <thead class="sticky top-0 bg-gray-50 z-10">
+              <tr>
+                <th class="p-2 font-medium text-text-muted-light w-8"><input type="checkbox" id="select-all" title="全選"/></th>
+                <th class="p-2 font-medium text-text-muted-light">狀態</th>
+                <th class="p-2 font-medium text-text-muted-light">時效</th>
+                <th class="p-2 font-medium text-text-muted-light sortable sort-id" data-sort="id" title="依檢體 ID 後五碼排序"><span>檢體 ID</span> <span class="sort-icon sort-icon-asc material-symbols-outlined text-xs align-middle">arrow_drop_up</span><span class="sort-icon sort-icon-desc material-symbols-outlined text-xs align-middle hidden">arrow_drop_down</span></th>
+                <th class="p-2 font-medium text-text-muted-light">病歷號</th>
+                <th class="p-2 font-medium text-text-muted-light">姓名</th>
+                <th class="p-2 font-medium text-text-muted-light">檢體來源</th>
+                <th class="p-2 font-medium text-text-muted-light">操作機台</th>
+                <th class="p-2 font-medium text-text-muted-light">檢體歸位</th>
+                <th class="p-2 font-medium text-text-muted-light sortable sort-time" data-sort="time" title="依分析時間排序"><span>分析時間</span> <span class="sort-icon sort-icon-asc material-symbols-outlined text-xs align-middle">arrow_drop_up</span><span class="sort-icon sort-icon-desc material-symbols-outlined text-xs align-middle hidden">arrow_drop_down</span></th>
+                <th class="p-2 font-medium text-text-muted-light">編輯人員</th>
+                <th class="p-2 font-medium text-text-muted-light w-24">操作</th>
+              </tr>
+            </thead>
+            <tbody id="specimen-tbody" class="divide-y divide-border-light"></tbody>
+          </table>
+        </div>
+      </main>
+
+      <aside class="w-1/3 flex-shrink-0 flex flex-col p-2 border-l border-border-light bg-background-light min-w-[280px]">
+        <div class="bg-surface-light p-3 rounded-md border border-border-light flex-grow flex flex-col overflow-y-auto">
+          <div class="flex-shrink-0">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-base font-semibold">檢體總覽</h3>
+              <span class="text-sm font-medium text-primary" id="sidebar-specimen-id">-</span>
+            </div>
+            <div id="sidebar-placeholder" class="text-text-muted-light text-sm py-4">
+              請從左側列表點選一筆檢體，或雙擊進入閱片。
+            </div>
+            <div id="sidebar-content" class="space-y-4 hidden">
+              <div>
+                <h4 class="text-sm font-semibold mb-2 text-text-light">檢體資訊</h4>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs" id="sidebar-info"></div>
+              </div>
+              <div class="border-t border-border-light pt-4">
+                <h4 class="text-sm font-semibold mb-3 text-text-light">分析與歷史</h4>
+                <div class="w-full text-xs overflow-x-auto">
+                  <table class="w-full border-collapse">
+                    <thead>
+                      <tr class="bg-gray-50">
+                        <th class="p-2 font-medium text-left text-text-muted-light">Metric</th>
+                        <th class="p-2 font-medium text-left text-text-muted-light">流式計數</th>
+                        <th class="p-2 font-medium text-left text-text-muted-light">AI</th>
+                        <th class="p-2 font-medium text-left text-text-muted-light">前次報告</th>
+                      </tr>
+                    </thead>
+                    <tbody id="sidebar-metrics" class="divide-y divide-border-light"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="flex justify-between items-center p-2 border-t border-border-light bg-surface-light text-xs text-text-muted-light">
+      <span id="footer-status">就緒</span>
+    </footer>
+  </div>
+
+  <script src="assets/data/database.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script>
+    (function () {
+      var currentSpecimenId = null;
+      var filteredList = [];
+      var currentMode = 'digital';
+      var sortKey = 'time';
+      var sortAsc = false;
+      var fontLevel = 1;
+
+      function setDefaultDateToday() {
+        var today = '2025-08-07';
+        var start = document.getElementById('analysis-date-start');
+        var end = document.getElementById('analysis-date-end');
+        if (start && !start.dataset.initialized) { start.value = today; start.dataset.initialized = '1'; }
+        if (end && !end.dataset.initialized) { end.value = today; end.dataset.initialized = '1'; }
+      }
+
+      function getSelectedStatuses() {
+        var checked = [];
+        document.querySelectorAll('.status-filter:checked').forEach(function (cb) { checked.push(cb.value); });
+        return checked;
+      }
+
+      function setStatusFilterCheckboxes(keys) {
+        document.querySelectorAll('.status-filter').forEach(function (cb) {
+          cb.checked = keys.indexOf(cb.value) !== -1;
+        });
+      }
+
+      function getFilters() {
+        return {
+          dateStart: document.getElementById('analysis-date-start').value,
+          dateEnd: document.getElementById('analysis-date-end').value,
+          department: document.getElementById('filter-department').value,
+          machine: document.getElementById('filter-machine').value,
+          search: (document.getElementById('specimen-search').value || '').trim(),
+          exactMatch: document.getElementById('exact-match').checked,
+          statuses: getSelectedStatuses()
+        };
+      }
+
+      function applyFilters() {
+        var f = getFilters();
+        filteredList = MOCK_SPECIMENS.filter(function (s) {
+          if (f.dateStart && s.analysisTime) {
+            var docDate = s.analysisTime.slice(0, 10).replace(/\//g, '-');
+            if (docDate < f.dateStart) return false;
+          }
+          if (f.dateEnd && s.analysisTime) {
+            var docDate = s.analysisTime.slice(0, 10).replace(/\//g, '-');
+            if (docDate > f.dateEnd) return false;
+          }
+          if (f.department && s.department !== f.department) return false;
+          if (f.machine && s.machine !== f.machine) return false;
+          if (f.search) {
+            var id = (s.id || '').toUpperCase();
+            var pid = (s.patientId || '').toUpperCase();
+            var search = f.search.toUpperCase();
+            if (f.exactMatch) {
+              if (id !== search && pid !== search) return false;
+            } else {
+              if (id.indexOf(search) === -1 && pid.indexOf(search) === -1) return false;
+            }
+          }
+          var selected = f.statuses || [];
+          if (selected.length === 0) return true;
+          var hasStatus = (s.status || []).some(function (st) { return selected.indexOf(st) !== -1; });
+          var isVerified = s.statusDone && selected.indexOf('Verified') !== -1;
+          if (!hasStatus && !isVerified) return false;
+          return true;
+        });
+        if (sortKey === 'id') {
+          filteredList.sort(function (a, b) {
+            var a5 = (a.id || '').slice(-5);
+            var b5 = (b.id || '').slice(-5);
+            var cmp = a5.localeCompare(b5, undefined, { numeric: true });
+            return sortAsc ? cmp : -cmp;
+          });
+        } else if (sortKey === 'time') {
+          filteredList.sort(function (a, b) {
+            var ta = (a.analysisTime || '').replace(/-/g, '').replace(/[:\s]/g, '');
+            var tb = (b.analysisTime || '').replace(/-/g, '').replace(/[:\s]/g, '');
+            var cmp = ta.localeCompare(tb);
+            return sortAsc ? cmp : -cmp;
+          });
+        }
+        return filteredList;
+      }
+
+      function renderStatus(specimen) {
+        var html = '';
+        var statuses = specimen.status || [];
+        statuses.forEach(function (st) {
+          var style = STATUS_STYLES[st] || 'bg-gray-100 text-gray-800';
+          var done = specimen.statusDone && st !== 'Locked';
+          if (done) style = 'bg-green-100 text-green-800';
+          html += '<span class="status-capsule ' + style + '">';
+          if (done) html += '<span class="material-symbols-outlined text-xs mr-1">check</span>';
+          if (st === 'Locked') html += '<span class="material-symbols-outlined text-xs mr-1">lock</span>';
+          html += st + '</span>';
+        });
+        return html;
+      }
+
+      function rowClass(s, index) {
+        if (s.locked) return 'bg-striped';
+        if (s.statusDone) return 'bg-gray-50';
+        return index % 2 ? 'bg-gray-50' : 'bg-white';
+      }
+
+      function renderTable() {
+        applyFilters();
+        var tbody = document.getElementById('specimen-tbody');
+        tbody.innerHTML = '';
+        filteredList.forEach(function (s, i) {
+          var tr = document.createElement('tr');
+          tr.className = 'hover:bg-gray-50 ' + rowClass(s, i);
+          tr.dataset.specimenId = s.id;
+          var enterDisabled = s.locked ? ' disabled' : '';
+          var enterText = s.locked ? '已鎖定' : '進入閱片';
+          tr.innerHTML =
+            '<td class="p-2"><input type="checkbox" class="row-check rounded border-gray-300 text-primary focus:ring-primary" data-id="' + s.id + '"/></td>' +
+            '<td class="p-2"><div class="flex flex-wrap gap-1">' + renderStatus(s) + '</div></td>' +
+            '<td class="p-2">' + (s.urgency != null ? s.urgency : '') + '</td>' +
+            '<td class="p-2">' + s.id + '</td>' +
+            '<td class="p-2">' + s.patientId + '</td>' +
+            '<td class="p-2">' + s.name + '</td>' +
+            '<td class="p-2">' + s.department + '</td>' +
+            '<td class="p-2">' + s.machine + '</td>' +
+            '<td class="p-2">' + s.location + '</td>' +
+            '<td class="p-2">' + s.analysisTime + '</td>' +
+            '<td class="p-2">' + (s.editor || '') + '</td>' +
+            '<td class="p-2"><button type="button" class="text-primary text-xs hover:underline enter-review-btn" data-id="' + s.id + '"' + enterDisabled + '>' + enterText + '</button></td>';
+          tbody.appendChild(tr);
+        });
+
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+          tr.addEventListener('click', function (e) {
+            if (e.target.type === 'checkbox' || e.target.classList.contains('enter-review-btn')) return;
+            selectRow(tr.dataset.specimenId);
+          });
+          tr.addEventListener('dblclick', function (e) {
+            if (e.target.type === 'checkbox') return;
+            var id = tr.dataset.specimenId;
+            var spec = getSpecimenById(id);
+            if (id && spec && !spec.locked) goToImageReview(id);
+          });
+        });
+        tbody.querySelectorAll('.enter-review-btn:not([disabled])').forEach(function (btn) {
+          btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var id = btn.dataset.id;
+            if (id) goToImageReview(id);
+          });
+        });
+        document.getElementById('footer-status').textContent = '已篩選 ' + filteredList.length + ' 筆';
+      }
+
+      document.getElementById('specimen-tbody').addEventListener('click', function (e) {
+        var cap = e.target.closest('.status-capsule');
+        if (cap) {
+          cap.classList.toggle('status-capsule-done');
+          e.stopPropagation();
+        }
+      });
+
+      function updateSortUI() {
+        document.querySelectorAll('th.sortable').forEach(function (th) {
+          th.classList.remove('sort-asc', 'sort-desc');
+          var iconAsc = th.querySelector('.sort-icon-asc');
+          var iconDesc = th.querySelector('.sort-icon-desc');
+          if (iconAsc) iconAsc.classList.add('hidden');
+          if (iconDesc) iconDesc.classList.add('hidden');
+          if (th.dataset.sort === sortKey) {
+            th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+            if (iconAsc) iconAsc.classList.toggle('hidden', !sortAsc);
+            if (iconDesc) iconDesc.classList.toggle('hidden', sortAsc);
+          }
+        });
+      }
+
+      function selectRow(id) {
+        currentSpecimenId = id;
+        document.querySelectorAll('#specimen-tbody tr').forEach(function (tr) {
+          tr.classList.remove('tr-selected');
+          if (tr.dataset.specimenId === id) tr.classList.add('tr-selected');
+        });
+        updateSidebar(id);
+      }
+
+      function updateSidebar(id) {
+        var spec = getSpecimenById(id);
+        document.getElementById('sidebar-specimen-id').textContent = id || '-';
+        if (!spec) {
+          document.getElementById('sidebar-placeholder').classList.remove('hidden');
+          document.getElementById('sidebar-content').classList.add('hidden');
+          return;
+        }
+        document.getElementById('sidebar-placeholder').classList.add('hidden');
+        document.getElementById('sidebar-content').classList.remove('hidden');
+
+        var info = [
+          ['病歷號', spec.patientId],
+          ['姓名', spec.name + ' (' + (spec.gender || '') + ')'],
+          ['生日', (spec.birthDate || '') + ' (' + (spec.age != null ? spec.age + '歲' : '') + ')'],
+          ['檢體來源', spec.department]
+        ];
+        document.getElementById('sidebar-info').innerHTML = info.map(function (p) {
+          return '<div><span class="text-text-muted-light">' + p[0] + ':</span><span class="text-text-light font-medium ml-1">' + (p[1] || '-') + '</span></div>';
+        }).join('');
+
+        var m = spec.metrics || {};
+        var prev = spec.prevReport || {};
+        var rows = [
+          ['WBC (10e9/L)', m.wbc, '-', prev.wbc],
+          ['PLT (10e9/L)', m.plt, '-', prev.plt],
+          ['Band (%)', m.band, m.band, prev.band],
+          ['Segmented neutrophil (%)', m.segmentedNeutrophil, m.segmentedNeutrophil, prev.segmentedNeutrophil],
+          ['Eosinophil (%)', m.eosinophil, m.eosinophil, prev.eosinophil],
+          ['Monocyte (%)', m.monocyte, m.monocyte, prev.monocyte],
+          ['Basophil (%)', m.basophil, m.basophil, prev.basophil],
+          ['Lymphocyte (%)', m.lymphocyte, m.lymphocyte, prev.lymphocyte],
+          ['Atypical lymphocyte (%)', m.atypicalLymphocyte, m.atypicalLymphocyte, prev.atypicalLymphocyte],
+          ['Blast (%)', m.blast, m.blast, prev.blast],
+          ['Promyelocyte (%)', m.promyelocyte, m.promyelocyte, prev.promyelocyte],
+          ['Myelocyte (%)', m.myelocyte, m.myelocyte, prev.myelocyte],
+          ['Metamyelocyte (%)', m.metamyelocyte, m.metamyelocyte, prev.metamyelocyte],
+          ['Hypersegmented (%)', m.hypersegmented, m.hypersegmented, prev.hypersegmented],
+          ['Promonocyte (%)', m.promonocyte, m.promonocyte, prev.promonocyte],
+          ['Plasma cell (%)', m.plasmaCell, m.plasmaCell, prev.plasmaCell],
+          ['Abnormal lymphocyte (%)', m.abnormalLymphocyte, m.abnormalLymphocyte, prev.abnormalLymphocyte]
+        ];
+        function shouldHighlightMetric(label, valueStr) {
+          var v = parseFloat(valueStr);
+          if (isNaN(v)) v = 0;
+          switch (label) {
+            case 'WBC (10e9/L)':
+              return v >= 30; // WBC Count ≧30,000/μl
+            case 'Lymphocyte (%)':
+              return v >= 60; // 成人≧60%
+            case 'Monocyte (%)':
+              return v >= 20;
+            case 'Eosinophil (%)':
+              return v >= 20;
+            case 'Basophil (%)':
+              return v >= 5;
+            case 'Atypical lymphocyte (%)':
+              return v >= 10;
+            case 'Blast (%)':
+              return valueStr && valueStr !== '-' && parseFloat(valueStr) > 0; // Present
+            case 'Promyelocyte (%)':
+              return valueStr && valueStr !== '-' && parseFloat(valueStr) > 0; // Present
+            case 'Myelocyte (%)':
+              return v >= 5;
+            case 'Metamyelocyte (%)':
+              return v >= 10;
+            case 'Promonocyte (%)':
+              return valueStr && valueStr !== '-' && parseFloat(valueStr) > 0; // Present
+            case 'Plasma cell (%)':
+              return valueStr && valueStr !== '-' && parseFloat(valueStr) > 0; // Present
+            case 'Abnormal lymphocyte (%)':
+              return valueStr && valueStr !== '-' && parseFloat(valueStr) > 0; // Present / Suspect
+            default:
+              return false;
+          }
+        }
+
+        document.getElementById('sidebar-metrics').innerHTML = rows.map(function (r) {
+          var label = r[0];
+          var aiValue = r[2];
+          var highlight = shouldHighlightMetric(label, aiValue);
+          var rowClass = highlight ? 'bg-danger-light/30' : '';
+          var cellClass = highlight ? 'font-bold text-danger-text-light' : '';
+          return '<tr class="' + rowClass + '"><td class="p-2 font-medium text-text-muted-light">' + label + '</td><td class="p-2">' + (r[1] || '-') + '</td><td class="p-2 ' + cellClass + '">' + (aiValue || '-') + '</td><td class="p-2 ' + cellClass + '">' + (r[3] || '-') + '</td></tr>';
+        }).join('');
+      }
+
+      document.getElementById('btn-filter').addEventListener('click', function () {
+        var panel = document.getElementById('filter-panel');
+        var open = !panel.classList.contains('hidden');
+        panel.classList.toggle('hidden', open);
+        this.setAttribute('aria-expanded', !open);
+      });
+
+      document.querySelectorAll('.status-filter').forEach(function (cb) {
+        cb.addEventListener('change', renderTable);
+      });
+
+      document.querySelectorAll('.mode-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          var mode = this.dataset.mode;
+          currentMode = mode;
+          document.querySelectorAll('.mode-tab').forEach(function (t) {
+            t.classList.remove('bg-primary', 'text-white', 'border-primary');
+            t.classList.add('border-border-light', 'text-text-light');
+            t.classList.toggle('bg-surface-light', true);
+          });
+          this.classList.remove('border-border-light', 'text-text-light', 'bg-surface-light');
+          this.classList.add('bg-primary', 'text-white', 'border-primary');
+          var defaults = MODE_DEFAULT_STATUS[mode === 'digital' ? 'digital' : 'entity'];
+          setStatusFilterCheckboxes(defaults);
+          renderTable();
+          if (filteredList.length) selectRow(filteredList[0].id);
+        });
+      });
+
+      document.querySelectorAll('th.sortable').forEach(function (th) {
+        th.addEventListener('click', function () {
+          var key = this.dataset.sort;
+          if (sortKey === key) sortAsc = !sortAsc;
+          else { sortKey = key; sortAsc = true; }
+          updateSortUI();
+          renderTable();
+          if (filteredList.length && currentSpecimenId) selectRow(currentSpecimenId);
+        });
+      });
+
+      document.getElementById('btn-search').addEventListener('click', function () { renderTable(); });
+      document.getElementById('specimen-search').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('btn-search').click();
+      });
+      document.getElementById('exact-match').addEventListener('change', renderTable);
+      document.getElementById('filter-department').addEventListener('change', renderTable);
+      document.getElementById('filter-machine').addEventListener('change', renderTable);
+
+      document.getElementById('font-smaller').addEventListener('click', function () {
+        fontLevel = Math.max(0, fontLevel - 1);
+        var body = document.getElementById('body-font-scale');
+        body.classList.remove('font-size-small', 'font-size-normal', 'font-size-large');
+        body.classList.add(['font-size-small', 'font-size-normal', 'font-size-large'][fontLevel]);
+      });
+      document.getElementById('font-larger').addEventListener('click', function () {
+        fontLevel = Math.min(2, fontLevel + 1);
+        var body = document.getElementById('body-font-scale');
+        body.classList.remove('font-size-small', 'font-size-normal', 'font-size-large');
+        body.classList.add(['font-size-small', 'font-size-normal', 'font-size-large'][fontLevel]);
+      });
+
+      if (typeof APP_DATABASE !== 'undefined') {
+        var depSel = document.getElementById('filter-department');
+        if (APP_DATABASE.departments && depSel) APP_DATABASE.departments.forEach(function (d) { var o = document.createElement('option'); o.value = d; o.textContent = d; depSel.appendChild(o); });
+        var macSel = document.getElementById('filter-machine');
+        if (APP_DATABASE.machines && macSel) APP_DATABASE.machines.forEach(function (m) { var o = document.createElement('option'); o.value = m; o.textContent = m; macSel.appendChild(o); });
+      }
+      setDefaultDateToday();
+      setStatusFilterCheckboxes(['PLT Check', 'AI Alert', 'Follow-up', 'Digital Review', 'Verified', 'Locked']);
+      document.getElementById('tab-digital').classList.add('bg-primary', 'text-white', 'border-primary');
+      document.getElementById('tab-digital').classList.remove('bg-surface-light', 'border-border-light');
+      updateSortUI();
+      renderTable();
+      if (filteredList.length) selectRow(filteredList[0].id);
+    })();
+  </script>
+</body>
+</html>
