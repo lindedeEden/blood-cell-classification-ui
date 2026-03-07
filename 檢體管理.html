@@ -31,6 +31,7 @@
     };
   </script>
   <link rel="stylesheet" href="assets/css/common.css"/>
+  <link rel="stylesheet" href="assets/css/tutorial.css"/>
 </head>
 <body class="bg-background-light text-text-light text-sm font-size-normal" id="body-font-scale">
   <div class="flex flex-col h-screen">
@@ -42,6 +43,7 @@
           <a class="hover:text-primary" href="#">檔案(F)</a>
           <a class="hover:text-primary" href="#">工具(T)</a>
           <a class="hover:text-primary" href="#">說明(H)</a>
+          <button type="button" class="hover:text-primary focus:outline-none bg-transparent border-0 cursor-pointer text-inherit" id="btn-tutorial" title="使用教學">使用教學</button>
         </div>
       </div>
       <div class="flex items-center space-x-2">
@@ -52,10 +54,11 @@
       </div>
     </header>
 
-    <div class="flex flex-grow overflow-hidden">
+    <div class="flex flex-grow overflow-hidden" id="tutorial-specimen-full">
       <main class="flex-grow flex flex-col p-2 space-y-2">
+        <div id="tutorial-area-tl">
         <div class="flex flex-wrap items-center gap-4">
-          <div class="flex items-center space-x-2">
+          <div class="flex items-center space-x-2" id="tutorial-mode-tabs">
             <div class="inline-flex rounded-md shadow-sm" role="group">
               <button type="button" class="mode-tab px-4 py-2 text-sm font-medium border rounded-l-md" data-mode="digital" id="tab-digital">數位閱片</button>
               <button type="button" class="mode-tab px-4 py-2 text-sm font-medium border border-border-light rounded-r-md hover:bg-gray-100" data-mode="entity" id="tab-entity">實體作業</button>
@@ -79,7 +82,7 @@
           </div>
         </div>
 
-        <div class="bg-surface-light p-2 rounded-md border border-border-light">
+        <div class="bg-surface-light p-2 rounded-md border border-border-light" id="tutorial-filter-row">
           <div class="flex items-end flex-wrap gap-2">
             <div class="flex-1 min-w-[120px]">
               <label class="block text-xs font-medium text-text-muted-light" for="analysis-date-start">檢驗日期</label>
@@ -114,8 +117,9 @@
             </div>
           </div>
         </div>
+        </div>
 
-        <div class="flex-grow overflow-auto bg-surface-light rounded-md border border-border-light">
+        <div class="flex-grow overflow-auto bg-surface-light rounded-md border border-border-light" id="tutorial-specimen-list">
           <table class="w-full text-left">
             <thead class="sticky top-0 bg-gray-50 z-10">
               <tr>
@@ -138,13 +142,14 @@
         </div>
       </main>
 
-      <aside class="w-1/3 flex-shrink-0 flex flex-col p-2 border-l border-border-light bg-background-light min-w-[280px]">
+      <aside class="w-1/3 flex-shrink-0 flex flex-col p-2 border-l border-border-light bg-background-light min-w-[280px]" id="tutorial-sidebar-overview">
         <div class="bg-surface-light p-3 rounded-md border border-border-light flex-grow flex flex-col overflow-y-auto">
-          <div class="flex-shrink-0">
+          <div class="flex-shrink-0" id="tutorial-sidebar-header">
             <div class="flex justify-between items-center mb-4">
               <h3 class="text-base font-semibold">檢體總覽</h3>
               <span class="text-sm font-medium text-primary" id="sidebar-specimen-id">-</span>
             </div>
+            <div id="tutorial-sidebar-body">
             <div id="sidebar-placeholder" class="text-text-muted-light text-sm py-4">
               請從左側列表點選一筆檢體，或雙擊進入閱片。
             </div>
@@ -170,6 +175,7 @@
                 </div>
               </div>
             </div>
+            </div>
           </div>
         </div>
       </aside>
@@ -182,6 +188,7 @@
 
   <script src="assets/data/database.js"></script>
   <script src="assets/js/common.js"></script>
+  <script src="assets/js/tutorial.js"></script>
   <script>
     (function () {
       var currentSpecimenId = null;
@@ -533,6 +540,12 @@
       updateSortUI();
       renderTable();
       if (filteredList.length) selectRow(filteredList[0].id);
+
+      if (window.Tutorial) {
+        Tutorial.runOnSpecimenPage();
+        var btnTutorial = document.getElementById('btn-tutorial');
+        if (btnTutorial) btnTutorial.addEventListener('click', function () { Tutorial.startSpecimen(true); });
+      }
     })();
   </script>
 </body>

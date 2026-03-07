@@ -1,0 +1,132 @@
+/**
+ * 血球分類軟體 - 使用者教學樣式（步驟式高亮導覽）
+ */
+.tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  background: transparent;
+}
+.tutorial-overlay.tutorial-visible {
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+}
+
+/* 暗層在 z-index 0，spotlight 在 10000，框內會顯示在暗層上方故保持明亮 */
+.tutorial-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  z-index: 1;
+}
+
+/* 被框住的區塊高亮：spotlight 在暗層之上、透明無背景，框內見到底下頁面故明亮 */
+.tutorial-spotlight {
+  position: fixed;
+  display: none;
+  border: 3px solid #4F46E5;
+  border-radius: 8px;
+  background: transparent;
+  /* 內圈亮邊 + 外圈暗遮罩；框內為 spotlight 本身無遮罩，保持明亮 */
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.95), 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  z-index: 10;
+  transition: top 0.15s ease, left 0.15s ease, width 0.15s ease, height 0.15s ease;
+}
+
+.tutorial-card {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 480px;
+  width: calc(100% - 32px);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  padding: 20px 24px;
+  z-index: 10001;
+  pointer-events: auto;
+  border: 1px solid #e2e8f0;
+}
+
+.tutorial-card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 10px;
+}
+
+.tutorial-card-body {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #475569;
+  margin-bottom: 16px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.tutorial-card-body strong {
+  color: #334155;
+}
+
+.tutorial-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tutorial-card-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tutorial-card-dots {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.tutorial-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s ease;
+}
+
+.tutorial-btn-skip {
+  background: transparent;
+  color: #64748b;
+}
+.tutorial-btn-skip:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.tutorial-btn-next {
+  background: #4F46E5;
+  color: #fff;
+}
+.tutorial-btn-next:hover {
+  background: #4338ca;
+}
+
+.tutorial-btn-prev {
+  background: #f1f5f9;
+  color: #475569;
+}
+.tutorial-btn-prev:hover {
+  background: #e2e8f0;
+}
