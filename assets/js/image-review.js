@@ -265,9 +265,6 @@
       }
     }
 
-    var badgeEl = document.getElementById('sidebar-digital-badge');
-    if (badgeEl) badgeEl.textContent = digitalReviewList.length;
-
     var searchEl = document.getElementById('sidebar-search');
     if (searchEl) {
       searchEl.placeholder = '檢體 ID 搜尋…';

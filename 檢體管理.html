@@ -60,8 +60,8 @@
         <div class="flex flex-wrap items-center gap-4">
           <div class="flex items-center space-x-2" id="tutorial-mode-tabs">
             <div class="inline-flex rounded-md shadow-sm" role="group">
-              <button type="button" class="mode-tab px-4 py-2 text-sm font-medium border rounded-l-md" data-mode="digital" id="tab-digital">數位閱片</button>
-              <button type="button" class="mode-tab px-4 py-2 text-sm font-medium border border-border-light rounded-r-md hover:bg-gray-100" data-mode="entity" id="tab-entity">實體作業</button>
+              <button type="button" class="mode-tab px-4 py-2 text-sm font-medium border border-border-light rounded-l-md bg-surface-light text-text-muted-light hover:bg-gray-100" data-mode="digital" id="tab-digital">數位閱片</button>
+              <button type="button" class="mode-tab px-4 py-2 text-sm font-medium border border-border-light rounded-r-md bg-surface-light text-text-muted-light hover:bg-gray-100" data-mode="entity" id="tab-entity">實體作業</button>
             </div>
             <button type="button" class="flex items-center space-x-1 p-2 rounded-md border border-border-light bg-surface-light text-text-muted-light hover:bg-gray-100" id="btn-filter" aria-expanded="false">
               <span class="material-symbols-outlined text-base">filter_list</span>
@@ -125,7 +125,7 @@
               <tr>
                 <th class="p-2 font-medium text-text-muted-light w-8"><input type="checkbox" id="select-all" title="全選"/></th>
                 <th class="p-2 font-medium text-text-muted-light">狀態</th>
-                <th class="p-2 font-medium text-text-muted-light">時效</th>
+                <th class="p-2 font-medium text-text-muted-light sortable sort-urgency" data-sort="urgency" title="依時效排序"><span>時效</span> <span class="sort-icon sort-icon-asc material-symbols-outlined text-xs align-middle">arrow_drop_up</span><span class="sort-icon sort-icon-desc material-symbols-outlined text-xs align-middle hidden">arrow_drop_down</span></th>
                 <th class="p-2 font-medium text-text-muted-light sortable sort-id" data-sort="id" title="依檢體 ID 後五碼排序"><span>檢體 ID</span> <span class="sort-icon sort-icon-asc material-symbols-outlined text-xs align-middle">arrow_drop_up</span><span class="sort-icon sort-icon-desc material-symbols-outlined text-xs align-middle hidden">arrow_drop_down</span></th>
                 <th class="p-2 font-medium text-text-muted-light">病歷號</th>
                 <th class="p-2 font-medium text-text-muted-light">姓名</th>
@@ -193,7 +193,7 @@
     (function () {
       var currentSpecimenId = null;
       var filteredList = [];
-      var currentMode = 'digital';
+      var currentMode = null;
       var sortKey = 'time';
       var sortAsc = false;
       var fontLevel = 1;
@@ -254,14 +254,18 @@
             }
           }
           var selected = f.statuses || [];
+          var isVerifiedSpecimen = !!(s.statusDone || (s.status && s.status.indexOf('Verified') !== -1));
+          if (isVerifiedSpecimen && selected.indexOf('Verified') === -1) return false;
           if (selected.length === 0) return true;
           var hasStatus = (s.status || []).some(function (st) { return selected.indexOf(st) !== -1; });
-          var isVerified = s.statusDone && selected.indexOf('Verified') !== -1;
-          if (!hasStatus && !isVerified) return false;
+          var showVerified = isVerifiedSpecimen && selected.indexOf('Verified') !== -1;
+          if (!hasStatus && !showVerified) return false;
           return true;
         });
+        function isCompleted(s) { return !!(s.statusDone || (s.status && s.status.indexOf('Verified') !== -1)); }
         if (sortKey === 'id') {
           filteredList.sort(function (a, b) {
+            if (isCompleted(a) !== isCompleted(b)) return isCompleted(a) ? 1 : -1;
             var a5 = (a.id || '').slice(-5);
             var b5 = (b.id || '').slice(-5);
             var cmp = a5.localeCompare(b5, undefined, { numeric: true });
@@ -269,9 +273,20 @@
           });
         } else if (sortKey === 'time') {
           filteredList.sort(function (a, b) {
+            if (isCompleted(a) !== isCompleted(b)) return isCompleted(a) ? 1 : -1;
             var ta = (a.analysisTime || '').replace(/-/g, '').replace(/[:\s]/g, '');
             var tb = (b.analysisTime || '').replace(/-/g, '').replace(/[:\s]/g, '');
             var cmp = ta.localeCompare(tb);
+            return sortAsc ? cmp : -cmp;
+          });
+        } else if (sortKey === 'urgency') {
+          filteredList.sort(function (a, b) {
+            if (isCompleted(a) !== isCompleted(b)) return isCompleted(a) ? 1 : -1;
+            var ua = Number(a.urgency);
+            var ub = Number(b.urgency);
+            if (isNaN(ua)) ua = 0;
+            if (isNaN(ub)) ub = 0;
+            var cmp = ua - ub;
             return sortAsc ? cmp : -cmp;
           });
         }
@@ -310,24 +325,25 @@
           var enterDisabled = s.locked ? ' disabled' : '';
           var enterText = s.locked ? '已鎖定' : '進入閱片';
           tr.innerHTML =
-            '<td class="p-2"><input type="checkbox" class="row-check rounded border-gray-300 text-primary focus:ring-primary" data-id="' + s.id + '"/></td>' +
-            '<td class="p-2"><div class="flex flex-wrap gap-1">' + renderStatus(s) + '</div></td>' +
-            '<td class="p-2">' + (s.urgency != null ? s.urgency : '') + '</td>' +
-            '<td class="p-2">' + s.id + '</td>' +
-            '<td class="p-2">' + s.patientId + '</td>' +
-            '<td class="p-2">' + s.name + '</td>' +
-            '<td class="p-2">' + s.department + '</td>' +
-            '<td class="p-2">' + s.machine + '</td>' +
-            '<td class="p-2">' + s.location + '</td>' +
-            '<td class="p-2">' + s.analysisTime + '</td>' +
-            '<td class="p-2">' + (s.editor || '') + '</td>' +
-            '<td class="p-2"><button type="button" class="text-primary text-xs hover:underline enter-review-btn" data-id="' + s.id + '"' + enterDisabled + '>' + enterText + '</button></td>';
+            '<td class="p-2 py-4"><input type="checkbox" class="row-check rounded border-gray-300 text-primary focus:ring-primary" data-id="' + s.id + '"/></td>' +
+            '<td class="p-2 py-4"><div class="flex flex-col gap-1 items-start">' + renderStatus(s) + '</div></td>' +
+            '<td class="p-2 py-4">' + (s.urgency != null ? s.urgency : '') + '</td>' +
+            '<td class="p-2 py-4">' + s.id + '</td>' +
+            '<td class="p-2 py-4">' + s.patientId + '</td>' +
+            '<td class="p-2 py-4">' + s.name + '</td>' +
+            '<td class="p-2 py-4">' + s.department + '</td>' +
+            '<td class="p-2 py-4">' + s.machine + '</td>' +
+            '<td class="p-2 py-4">' + s.location + '</td>' +
+            '<td class="p-2 py-4">' + s.analysisTime + '</td>' +
+            '<td class="p-2 py-4">' + (s.editor || '') + '</td>' +
+            '<td class="p-2 py-4"><button type="button" class="text-primary text-xs hover:underline enter-review-btn" data-id="' + s.id + '"' + enterDisabled + '>' + enterText + '</button></td>';
           tbody.appendChild(tr);
         });
 
         tbody.querySelectorAll('tr').forEach(function (tr) {
           tr.addEventListener('click', function (e) {
             if (e.target.type === 'checkbox' || e.target.classList.contains('enter-review-btn')) return;
+            if (e.target.closest('.status-capsule')) return;
             selectRow(tr.dataset.specimenId);
           });
           tr.addEventListener('dblclick', function (e) {
@@ -402,24 +418,26 @@
 
         var m = spec.metrics || {};
         var prev = spec.prevReport || {};
+        var f = spec.flowCyt || {};
+        // 流式計數欄用 flowCyt：成熟細胞有值，未成熟/異常血球一律為 '-'
         var rows = [
-          ['WBC (10e9/L)', m.wbc, '-', prev.wbc],
-          ['PLT (10e9/L)', m.plt, '-', prev.plt],
-          ['Band (%)', m.band, m.band, prev.band],
-          ['Segmented neutrophil (%)', m.segmentedNeutrophil, m.segmentedNeutrophil, prev.segmentedNeutrophil],
-          ['Eosinophil (%)', m.eosinophil, m.eosinophil, prev.eosinophil],
-          ['Monocyte (%)', m.monocyte, m.monocyte, prev.monocyte],
-          ['Basophil (%)', m.basophil, m.basophil, prev.basophil],
-          ['Lymphocyte (%)', m.lymphocyte, m.lymphocyte, prev.lymphocyte],
-          ['Atypical lymphocyte (%)', m.atypicalLymphocyte, m.atypicalLymphocyte, prev.atypicalLymphocyte],
-          ['Blast (%)', m.blast, m.blast, prev.blast],
-          ['Promyelocyte (%)', m.promyelocyte, m.promyelocyte, prev.promyelocyte],
-          ['Myelocyte (%)', m.myelocyte, m.myelocyte, prev.myelocyte],
-          ['Metamyelocyte (%)', m.metamyelocyte, m.metamyelocyte, prev.metamyelocyte],
-          ['Hypersegmented (%)', m.hypersegmented, m.hypersegmented, prev.hypersegmented],
-          ['Promonocyte (%)', m.promonocyte, m.promonocyte, prev.promonocyte],
-          ['Plasma cell (%)', m.plasmaCell, m.plasmaCell, prev.plasmaCell],
-          ['Abnormal lymphocyte (%)', m.abnormalLymphocyte, m.abnormalLymphocyte, prev.abnormalLymphocyte]
+          ['WBC (10e9/L)', m.wbc, m.wbc, prev.wbc],
+          ['PLT (10e9/L)', m.plt, m.plt, prev.plt],
+          ['Band (%)', f.band !== undefined ? f.band : '-', m.band, prev.band],
+          ['Segmented neutrophil (%)', f.segmentedNeutrophil !== undefined ? f.segmentedNeutrophil : '-', m.segmentedNeutrophil, prev.segmentedNeutrophil],
+          ['Eosinophil (%)', f.eosinophil !== undefined ? f.eosinophil : '-', m.eosinophil, prev.eosinophil],
+          ['Monocyte (%)', f.monocyte !== undefined ? f.monocyte : '-', m.monocyte, prev.monocyte],
+          ['Basophil (%)', f.basophil !== undefined ? f.basophil : '-', m.basophil, prev.basophil],
+          ['Lymphocyte (%)', f.lymphocyte !== undefined ? f.lymphocyte : '-', m.lymphocyte, prev.lymphocyte],
+          ['Atypical lymphocyte (%)', f.atypicalLymphocyte !== undefined ? f.atypicalLymphocyte : '-', m.atypicalLymphocyte, prev.atypicalLymphocyte],
+          ['Blast (%)', f.blast !== undefined ? f.blast : '-', m.blast, prev.blast],
+          ['Promyelocyte (%)', f.promyelocyte !== undefined ? f.promyelocyte : '-', m.promyelocyte, prev.promyelocyte],
+          ['Myelocyte (%)', f.myelocyte !== undefined ? f.myelocyte : '-', m.myelocyte, prev.myelocyte],
+          ['Metamyelocyte (%)', f.metamyelocyte !== undefined ? f.metamyelocyte : '-', m.metamyelocyte, prev.metamyelocyte],
+          ['Hypersegmented (%)', f.hypersegmented !== undefined ? f.hypersegmented : '-', m.hypersegmented, prev.hypersegmented],
+          ['Promonocyte (%)', f.promonocyte !== undefined ? f.promonocyte : '-', m.promonocyte, prev.promonocyte],
+          ['Plasma cell (%)', f.plasmaCell !== undefined ? f.plasmaCell : '-', m.plasmaCell, prev.plasmaCell],
+          ['Abnormal lymphocyte (%)', f.abnormalLymphocyte !== undefined ? f.abnormalLymphocyte : '-', m.abnormalLymphocyte, prev.abnormalLymphocyte]
         ];
         function shouldHighlightMetric(label, valueStr) {
           var v = parseFloat(valueStr);
@@ -459,10 +477,11 @@
         document.getElementById('sidebar-metrics').innerHTML = rows.map(function (r) {
           var label = r[0];
           var aiValue = r[2];
-          var highlight = shouldHighlightMetric(label, aiValue);
+          var prevValue = r[3];
+          var highlight = shouldHighlightMetric(label, aiValue) || shouldHighlightMetric(label, prevValue);
           var rowClass = highlight ? 'bg-danger-light/30' : '';
           var cellClass = highlight ? 'font-bold text-danger-text-light' : '';
-          return '<tr class="' + rowClass + '"><td class="p-2 font-medium text-text-muted-light">' + label + '</td><td class="p-2">' + (r[1] || '-') + '</td><td class="p-2 ' + cellClass + '">' + (aiValue || '-') + '</td><td class="p-2 ' + cellClass + '">' + (r[3] || '-') + '</td></tr>';
+          return '<tr class="' + rowClass + '"><td class="p-2 font-medium text-text-muted-light">' + label + '</td><td class="p-2">' + (r[1] || '-') + '</td><td class="p-2 ' + cellClass + '">' + (aiValue || '-') + '</td><td class="p-2 ' + cellClass + '">' + (prevValue || '-') + '</td></tr>';
         }).join('');
       }
 
@@ -483,10 +502,9 @@
           currentMode = mode;
           document.querySelectorAll('.mode-tab').forEach(function (t) {
             t.classList.remove('bg-primary', 'text-white', 'border-primary');
-            t.classList.add('border-border-light', 'text-text-light');
-            t.classList.toggle('bg-surface-light', true);
+            t.classList.add('border-border-light', 'bg-surface-light', 'text-text-muted-light');
           });
-          this.classList.remove('border-border-light', 'text-text-light', 'bg-surface-light');
+          this.classList.remove('border-border-light', 'text-text-muted-light', 'bg-surface-light');
           this.classList.add('bg-primary', 'text-white', 'border-primary');
           var defaults = MODE_DEFAULT_STATUS[mode === 'digital' ? 'digital' : 'entity'];
           setStatusFilterCheckboxes(defaults);
@@ -535,8 +553,6 @@
       }
       setDefaultDateToday();
       setStatusFilterCheckboxes(['PLT Check', 'AI Alert', 'Follow-up', 'Digital Review', 'Verified', 'Locked']);
-      document.getElementById('tab-digital').classList.add('bg-primary', 'text-white', 'border-primary');
-      document.getElementById('tab-digital').classList.remove('bg-surface-light', 'border-border-light');
       updateSortUI();
       renderTable();
       if (filteredList.length) selectRow(filteredList[0].id);

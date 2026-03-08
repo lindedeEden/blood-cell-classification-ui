@@ -20,11 +20,16 @@
   background-color: #dcfce7 !important;
   color: #166534 !important;
 }
-.status-capsule:hover::before,
-.status-capsule.status-capsule-done::before {
+/* 預留打勾空間（visibility: hidden 佔位），避免 hover/done 時膠囊寬度變化造成版面抖動 */
+.status-capsule::before {
   content: '\2713';
   margin-right: 0.25rem;
   font-weight: 700;
+  visibility: hidden;
+}
+.status-capsule:hover::before,
+.status-capsule.status-capsule-done::before {
+  visibility: visible;
 }
 .bg-striped {
   background-color: #f9fafb;

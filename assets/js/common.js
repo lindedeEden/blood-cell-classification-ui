@@ -55,8 +55,8 @@ const STATUS_STYLES = {
   'Locked': 'bg-gray-200 text-gray-800 border border-gray-300'
 };
 
-// 模式預設勾選的狀態（數位閱片 / 實體作業）
+// 模式預設勾選的狀態（數位閱片 / 實體作業）；兩種模式預設都含 Verified，使用者可自行取消勾選以隱藏已完成檢體
 const MODE_DEFAULT_STATUS = {
-  digital: ['Digital Review'],
-  entity: ['Follow-up', 'PLT Check', 'AI Alert']
+  digital: ['Digital Review', 'Verified'],
+  entity: ['Follow-up', 'PLT Check', 'AI Alert', 'Verified']
 };

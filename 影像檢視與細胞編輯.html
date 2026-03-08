@@ -136,8 +136,7 @@
 <div class="flex items-center gap-2">
 <div class="relative flex-1 group">
 <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-lg group-focus-within:text-primary transition-colors">search</span>
-<input id="sidebar-search" class="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg border-gray-200 bg-gray-50 focus:ring-primary focus:border-primary" placeholder="檢體 ID 搜尋…" type="text"/>
-<div id="sidebar-digital-badge" class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full">0</div>
+<input id="sidebar-search" class="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border-gray-200 bg-gray-50 focus:ring-primary focus:border-primary" placeholder="檢體 ID 搜尋…" type="text"/>
 </div>
 <div class="flex gap-1">
 <button type="button" id="sidebar-prev" class="flex items-center justify-center size-8 rounded border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors">
@@ -153,15 +152,15 @@
 </div>
 <div id="tutorial-image-bl">
 <details id="sidebar-patient-details" class="group border border-gray-200/80 rounded-lg shadow-subtle overflow-hidden" open="">
-<summary class="flex items-center justify-between p-3 cursor-pointer list-none bg-white hover:bg-gray-50 transition-colors">
+<summary class="flex items-center justify-between py-2 px-3 cursor-pointer list-none bg-white hover:bg-gray-50 transition-colors">
 <div class="flex items-center gap-2">
 <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider">檢體資訊</h3>
 <span class="patient-name-summary text-xs text-gray-500"></span>
 </div>
 <span class="material-symbols-outlined text-gray-400 transition-transform duration-200 group-open:rotate-180">expand_more</span>
 </summary>
-<div class="p-3 pt-0 group-open:min-h-[100px]">
-<div class="patient-info-grid grid grid-cols-2 gap-x-8 gap-y-1 text-[11px] leading-snug">
+<div class="px-3 pb-2 pt-0">
+<div class="patient-info-grid grid grid-cols-2 gap-x-6 gap-y-0.5 text-[11px] leading-snug">
 <div><span class="font-medium text-gray-500">病歷號:</span> <span id="sidebar-patient-id" class="font-normal text-gray-700"></span></div>
 <div><span class="font-medium text-gray-500">科別:</span> <span id="sidebar-patient-dept" class="font-normal text-gray-700"></span></div>
 <div><span class="font-medium text-gray-500">機台:</span> <span id="sidebar-patient-machine" class="font-normal text-gray-700"></span></div>
