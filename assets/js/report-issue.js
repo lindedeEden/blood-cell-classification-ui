@@ -2,6 +2,7 @@
 (function () {
   'use strict';
 
+  // 達任一條件即為留單，橫幅顯示紅色；未達則綠色
   var LEAVE_THRESHOLDS = {
     wbc: 30,
     lymphocyte: 60,
@@ -12,7 +13,10 @@
     blast: 'present',
     promyelocyte: 'present',
     myelocyte: 5,
-    metamyelocyte: 10
+    metamyelocyte: 10,
+    promonocyte: 'present',
+    plasmaCell: 'present',
+    abnormalLymphocyte: 'present'
   };
 
   var COMMON_ROWS = [
@@ -65,13 +69,33 @@
       id = APP_DATABASE.specimens[0].id;
     }
     if (!id) return null;
-    if (typeof getSpecimenById === 'function') return getSpecimenById(id);
-    var list = (typeof APP_DATABASE !== 'undefined' && APP_DATABASE.specimens) ? APP_DATABASE.specimens : [];
-    return list.find(function (s) { return s.id === id; }) || null;
+    var spec;
+    if (typeof getSpecimenById === 'function') {
+      spec = getSpecimenById(id);
+    } else {
+      var list = (typeof APP_DATABASE !== 'undefined' && APP_DATABASE.specimens) ? APP_DATABASE.specimens : [];
+      spec = list.find(function (s) { return s.id === id; }) || null;
+    }
+    if (!spec) return null;
+    // 從 localStorage 讀取影像檢視頁儲存的人工編輯結果（若有）
+    try {
+      var key = 'editedMetrics:' + spec.id;
+      var raw = window.localStorage.getItem(key);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          spec.editedMetrics = parsed;
+        }
+      }
+    } catch (e) {
+      // 若讀取失敗則忽略，維持原本 metrics 顯示
+    }
+    return spec;
   }
 
   function buildWbcTable(spec) {
     var metrics = spec.metrics || {};
+    var editedMetrics = spec.editedMetrics || {};
     var prev = spec.prevReport || {};
     var tbody = document.getElementById('wbc-table-body');
     if (!tbody) return;
@@ -84,7 +108,8 @@
     function addRow(rowLabel, key) {
       var flow = metrics[key] || '-';
       var ai = metrics[key] || '-';
-      var edited = metrics[key] || '-';
+      // 人員編輯：若有人工編輯結果，優先顯示；否則退回原始 metrics
+      var edited = editedMetrics[key] != null ? editedMetrics[key] : (metrics[key] || '-');
       var prevVal = prev[key] || '-';
       var abnormal = isAbnormalValue(key, edited);
       var rowClass = abnormal ? 'bg-medical-red/5 hover:bg-medical-red/10' : 'hover:bg-zinc-50/50';
@@ -114,45 +139,51 @@
     tbody.innerHTML = html;
   }
 
+  // 判斷人員編輯結果是否與 AI 不同（醫檢師有更動才以人員編輯判定橫幅，未更動則以 AI 判定）
+  function editedDiffersFromAi(editedMetrics, metrics) {
+    var keys = Object.keys(LEAVE_THRESHOLDS);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (parseNum(editedMetrics[k]) !== parseNum(metrics[k])) return true;
+    }
+    return false;
+  }
+
   function applyRiskBanner(spec) {
     var metrics = spec.metrics || {};
+    var editedMetrics = spec.editedMetrics || {};
+    // 有人員編輯且與 AI 不同 → 以人員編輯結果判定；無人編輯或與 AI 相同（未更動）→ 以 AI 判定
+    var hasEdited = Object.keys(editedMetrics).length > 0;
+    var useEdited = hasEdited && editedDiffersFromAi(editedMetrics, metrics);
+    var effective = useEdited ? editedMetrics : metrics;
     var keys = Object.keys(LEAVE_THRESHOLDS);
-    var hasHigh = false;
-    var hasAny = false;
+    var hasLeave = false;
     keys.forEach(function (k) {
-      if (isAbnormalValue(k, metrics[k])) {
-        hasAny = true;
-        if (k === 'blast' || k === 'promyelocyte') hasHigh = true;
-      }
+      if (isAbnormalValue(k, effective[k])) hasLeave = true;
     });
     var banner = document.getElementById('risk-banner');
     var icon = document.getElementById('risk-icon');
     var text = document.getElementById('risk-text');
     if (!banner || !icon || !text) return;
     banner.className = 'px-6 py-2.5 flex items-center justify-between gap-4 shrink-0 border-b';
-    if (hasHigh) {
+    if (hasLeave) {
       banner.className += ' bg-medical-red border-medical-red/20';
       icon.textContent = 'warning';
       icon.className = 'material-symbols-outlined text-white fill-1 scale-100';
       text.className = 'text-md font-bold leading-tight tracking-tight text-white';
-      text.textContent = '高風險警示：檢出留單條件細胞，請謹慎核發';
-    } else if (hasAny) {
-      banner.className += ' bg-yellow-500 border-yellow-500/20';
-      icon.textContent = 'warning';
-      icon.className = 'material-symbols-outlined text-white';
-      text.className = 'text-md font-bold leading-tight tracking-tight text-white';
-      text.textContent = '異常提醒：檢出異常血球，請確認分類與數值';
+      text.textContent = '留單警示：已達留單標準，請確認是否需人工鏡檢或留單後再核發';
     } else {
       banner.className += ' bg-emerald-600 border-emerald-600/20';
       icon.textContent = 'check_circle';
       icon.className = 'material-symbols-outlined text-white';
       text.className = 'text-md font-bold leading-tight tracking-tight text-white';
-      text.textContent = '狀態良好：未見異常血球';
+      text.textContent = '狀態良好：未達留單標準';
     }
   }
 
   function buildOtherTable(spec) {
     var metrics = spec.metrics || {};
+    var editedMetrics = spec.editedMetrics || {};
     var prev = spec.prevReport || {};
     var tbody = document.getElementById('other-table-body');
     if (!tbody) return;
@@ -162,7 +193,8 @@
       var key = r[1];
       var flow = metrics[key] || '-';
       var ai = metrics[key] || '-';
-      var edited = metrics[key] || '-';
+      // 其他發現的人員編輯欄位，同樣優先採用 editedMetrics
+      var edited = editedMetrics[key] != null ? editedMetrics[key] : (metrics[key] || '-');
       var prevVal = prev[key] || '-';
       html += '<tr class="hover:bg-zinc-50/30">';
       html += '<td class="px-3 py-1.5 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">' + label + '</td>';

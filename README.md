@@ -90,11 +90,10 @@
 - **頂部標題列**：
   - 僅顯示：檢體編號 `H5080xxxxx` ＋ 目前狀態膠囊（如 Digital Review / PLT Check 等）。
   - 若該檢體已被簽核（含 `Verified`），`Digital Review` 會變成 **綠色＋打勾** 的樣式。
-- **風險警示橫幅**（紅 / 黃 / 綠）：
-  - 根據 `metrics` 與門檻 `LEAVE_THRESHOLDS`：
-    - 紅色：有留單條件細胞（例如 Blast / Promyelocyte present）。
-    - 黃色：有異常血球但未達留單標準。
-    - 綠色：目前指標皆在正常範圍。
+- **風險警示橫幅**（紅 / 綠）：
+  - 根據人員編輯或 AI 數據與門檻 `LEAVE_THRESHOLDS`：
+    - **紅色**：已達留單標準（任一留單條件成立，如 WBC/分類百分比閾值，或 Blast / Promyelocyte / Promonocyte / Plasma cell / Abnormal lymphocyte present 等），簽核前請確認是否需人工鏡檢或留單。
+    - **綠色**：未達留單標準。
 - **血球分類計數 (WBC) 表格**：
   - 依規格分成兩段：
     - 常見細胞：Band → Seg → Eo → Mono → Baso → Lym → Atypical Lym。

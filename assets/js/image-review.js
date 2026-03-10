@@ -15,7 +15,10 @@
     blast: 'present',
     promyelocyte: 'present',
     myelocyte: 5,
-    metamyelocyte: 10
+    metamyelocyte: 10,
+    promonocyte: 'present',
+    plasmaCell: 'present',
+    abnormalLymphocyte: 'present'
   };
 
   var ABNORMAL_ORDER = ['Blast', 'Promyelocyte', 'Myelocyte', 'Metamyelocyte', 'Hypersegmented', 'Promonocyte', 'Plasma Cell', 'Abnormal Lymphocyte'];
@@ -539,6 +542,67 @@
     });
   }
 
+  // 依目前細胞區塊的分類結果，計算「人員編輯」用的百分比數據，
+  // 供報告核發介面的人員編輯欄位與其他發現欄位使用。
+  function computeEditedMetricsFromCells() {
+    if (!currentSpecimen || !cellData || !cellData.length) return;
+    var total = cellData.length;
+    if (total === 0) return;
+
+    // 細胞群組標題 → metrics / otherFindings 對應欄位 key
+    var categoryToKey = {
+      'Blast': 'blast',
+      'Promyelocyte': 'promyelocyte',
+      'Myelocyte': 'myelocyte',
+      'Metamyelocyte': 'metamyelocyte',
+      'Hypersegmented': 'hypersegmented',
+      'Promonocyte': 'promonocyte',
+      'Plasma Cell': 'plasmaCell',
+      'Abnormal Lymphocyte': 'abnormalLymphocyte',
+      'Band': 'band',
+      'Segmented Neutrophil': 'segmentedNeutrophil',
+      'Lymphocyte': 'lymphocyte',
+      'Monocyte': 'monocyte',
+      'Eosinophil': 'eosinophil',
+      'Basophil': 'basophil',
+      // 其他發現
+      'NRBC': 'nrbc',
+      'Giant PLT': 'giantPlt',
+      'Megakaryocyte': 'megakaryocyte',
+      'Smudge Cell': 'smudgeCell',
+      'Artefact': 'artefact'
+    };
+
+    var countsByCategory = {};
+    cellData.forEach(function (c) {
+      if (!countsByCategory[c.category]) countsByCategory[c.category] = 0;
+      countsByCategory[c.category]++;
+    });
+
+    var edited = {};
+    Object.keys(categoryToKey).forEach(function (cat) {
+      edited[categoryToKey[cat]] = '-';
+    });
+
+    Object.keys(countsByCategory).forEach(function (cat) {
+      var key = categoryToKey[cat];
+      if (!key) return;
+      var count = countsByCategory[cat];
+      var pct = total ? (count / total * 100) : 0;
+      edited[key] = pct > 0 ? (pct.toFixed(1).replace(/\.0$/, '')) : '-';
+    });
+
+    // 將人工編輯結果暫存到目前檢體
+    currentSpecimen.editedMetrics = edited;
+    // 並存到 localStorage，讓報告核發 iframe 也能讀取到同一筆結果
+    try {
+      var key = 'editedMetrics:' + currentSpecimen.id;
+      window.localStorage.setItem(key, JSON.stringify(edited));
+    } catch (e) {
+      // 若瀏覽器禁止 localStorage，略過不影響其他功能
+    }
+  }
+
   function moveSelectedToCategory(category) {
     var ids = Array.from(selectedCellIds);
     ids.forEach(function (id) {
@@ -604,6 +668,9 @@
       }
       return;
     }
+    // 儲存並開啟報告核發前，先依目前細胞分類結果更新「人員編輯」數據
+    computeEditedMetricsFromCells();
+
     var modalEl = document.getElementById('report-issue-modal');
     var iframeEl = document.getElementById('report-issue-iframe');
     if (modalEl && iframeEl) {
