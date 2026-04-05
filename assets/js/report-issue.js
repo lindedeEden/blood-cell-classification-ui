@@ -102,7 +102,7 @@
     var html = '';
 
     function addSection(label) {
-      html += '<tr class="bg-zinc-50/30 dark:bg-zinc-800/10"><td class="px-4 py-1.5 text-xs font-bold text-zinc-400 uppercase tracking-widest" colspan="5">' + label + '</td></tr>';
+      html += '<tr class="bg-zinc-50/30 dark:bg-zinc-800/10"><td class="px-4 py-1.5 text-xs font-bold text-zinc-600 uppercase tracking-widest" colspan="5">' + label + '</td></tr>';
     }
 
     function addRow(rowLabel, key) {
@@ -114,7 +114,7 @@
       var abnormal = isAbnormalValue(key, edited);
       var rowClass = abnormal ? 'bg-medical-red/5 hover:bg-medical-red/10' : 'hover:bg-zinc-50/50';
       var nameClass = abnormal ? 'text-medical-red font-bold' : 'text-zinc-800 dark:text-zinc-200 font-semibold';
-      var valueClass = abnormal ? 'text-medical-red font-bold' : 'text-zinc-500';
+      var valueClass = abnormal ? 'text-medical-red font-bold' : 'text-zinc-600';
       var editedClass = abnormal ? 'text-medical-red font-black bg-medical-red/10' : 'text-zinc-900 dark:text-zinc-100 font-bold bg-blue-50/30';
       html += '<tr class="' + rowClass + '">';
       html += '<td class="px-4 py-2 text-base ' + nameClass + '">';
@@ -127,7 +127,7 @@
       html += '<td class="px-2 py-2 text-base text-right tabular ' + valueClass + '">' + (flow || '-') + '</td>';
       html += '<td class="px-2 py-2 text-base text-right tabular ' + valueClass + '">' + (ai || '-') + '</td>';
       html += '<td class="px-2 py-2 text-base text-right tabular ' + editedClass + '">' + (edited || '-') + '</td>';
-      html += '<td class="px-2 py-2 text-base text-right tabular text-zinc-400">' + (prevVal || '-') + '</td>';
+      html += '<td class="px-2 py-2 text-base text-right tabular text-zinc-600">' + (prevVal || '-') + '</td>';
       html += '</tr>';
     }
 
@@ -198,10 +198,10 @@
       var prevVal = prev[key] || '-';
       html += '<tr class="hover:bg-zinc-50/30">';
       html += '<td class="px-3 py-1.5 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">' + label + '</td>';
-      html += '<td class="px-2 py-1.5 text-zinc-400 text-xs text-right tabular">' + (flow || '-') + '</td>';
-      html += '<td class="px-2 py-1.5 text-zinc-400 text-xs text-right tabular">' + (ai || '-') + '</td>';
+      html += '<td class="px-2 py-1.5 text-zinc-600 text-xs text-right tabular">' + (flow || '-') + '</td>';
+      html += '<td class="px-2 py-1.5 text-zinc-600 text-xs text-right tabular">' + (ai || '-') + '</td>';
       html += '<td class="px-2 py-1.5 text-zinc-900 dark:text-zinc-100 text-xs font-bold text-right tabular bg-blue-50/30">' + (edited || '-') + '</td>';
-      html += '<td class="px-2 py-1.5 text-zinc-400 text-xs text-right tabular">' + (prevVal || '-') + '</td>';
+      html += '<td class="px-2 py-1.5 text-zinc-600 text-xs text-right tabular">' + (prevVal || '-') + '</td>';
       html += '</tr>';
     });
     tbody.innerHTML = html;
@@ -226,6 +226,8 @@
   }
 
   function init() {
+    if (typeof window.initAppFontLevel === 'function') window.initAppFontLevel();
+
     var spec = getSpecimen();
     if (!spec) return;
     var title = document.getElementById('report-specimen-id');

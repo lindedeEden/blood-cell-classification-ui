@@ -13,7 +13,7 @@
   var currentMode = 'digital';
   var sortKey = 'time';
   var sortAsc = false;
-  var fontLevel = 1;
+  var fontLevel = typeof initAppFontLevel === 'function' ? initAppFontLevel() : 1;
 
   function setDefaultDateToday() {
     // 測試環境固定日期，方便不用每次手動調整
@@ -257,7 +257,7 @@
       var highlight = shouldHighlightMetric(label, aiVal);
       var rowClass = highlight ? 'bg-red-50' : '';
       var valClass = highlight ? 'text-red-600 font-bold' : '';
-      return '<tr class="' + rowClass + '"><td class="p-1.5">' + label + '</td>' +
+      return '<tr class="' + rowClass + '"><td class="p-1.5 font-semibold text-text-muted-light">' + label + '</td>' +
         '<td class="p-1.5 text-right">' + (r[1] || '-') + '</td>' +
         '<td class="p-1.5 text-right ' + valClass + '">' + (aiVal || '-') + '</td>' +
         '<td class="p-1.5 text-right">' + (r[3] || '-') + '</td></tr>';
@@ -306,14 +306,14 @@
       });
     });
 
-    document.getElementById('font-dec').addEventListener('click', function () {
-      if (fontLevel > 0) fontLevel--;
-      document.documentElement.style.setProperty('--font-scale', 1 + fontLevel * 0.1);
-    });
-    document.getElementById('font-inc').addEventListener('click', function () {
-      if (fontLevel < 3) fontLevel++;
-      document.documentElement.style.setProperty('--font-scale', 1 + fontLevel * 0.1);
-    });
+    var fs = document.getElementById('font-smaller');
+    var fl = document.getElementById('font-larger');
+    if (fs && typeof adjustAppFontLevel === 'function') {
+      fs.addEventListener('click', function () { fontLevel = adjustAppFontLevel(-1); });
+    }
+    if (fl && typeof adjustAppFontLevel === 'function') {
+      fl.addEventListener('click', function () { fontLevel = adjustAppFontLevel(1); });
+    }
   }
 
   function populateFilters() {

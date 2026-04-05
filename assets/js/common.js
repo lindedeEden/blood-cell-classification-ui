@@ -3,6 +3,47 @@
  * 病患／檢體資料請由 assets/data/database.js 載入後使用 APP_DATABASE。
  */
 
+/** 與檢體管理／影像檢視／報告核發共用的字型段階（0 小、1 中、2 大、3 最大），存於 localStorage */
+var APP_FONT_LEVEL_STORAGE_KEY = 'blood-morphology-font-level';
+var APP_FONT_LEVEL_CLASSES = ['font-size-small', 'font-size-normal', 'font-size-large', 'font-size-xlarge'];
+
+function clampAppFontLevel(n) {
+  var x = parseInt(n, 10);
+  if (isNaN(x)) return 1;
+  return Math.max(0, Math.min(3, x));
+}
+
+function getStoredFontLevel() {
+  try {
+    var v = localStorage.getItem(APP_FONT_LEVEL_STORAGE_KEY);
+    if (v === null || v === '') return 1;
+    return clampAppFontLevel(v);
+  } catch (e) {
+    return 1;
+  }
+}
+
+function applyAppFontLevel(level) {
+  level = clampAppFontLevel(level);
+  var root = document.documentElement;
+  APP_FONT_LEVEL_CLASSES.forEach(function (c) { root.classList.remove(c); });
+  root.classList.add(APP_FONT_LEVEL_CLASSES[level]);
+  try {
+    localStorage.setItem(APP_FONT_LEVEL_STORAGE_KEY, String(level));
+  } catch (e) {}
+  return level;
+}
+
+/** 進入頁面時呼叫：自 localStorage 還原並套用至 html */
+function initAppFontLevel() {
+  return applyAppFontLevel(getStoredFontLevel());
+}
+
+/** 相對於目前儲存段階增減（例如 -1 / +1） */
+function adjustAppFontLevel(delta) {
+  return applyAppFontLevel(getStoredFontLevel() + delta);
+}
+
 // 檢體清單：由數據資料庫提供，未載入時為空陣列
 var MOCK_SPECIMENS = (typeof APP_DATABASE !== 'undefined' && APP_DATABASE.specimens) ? APP_DATABASE.specimens : [];
 

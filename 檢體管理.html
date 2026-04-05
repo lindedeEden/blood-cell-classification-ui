@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-TW" class="font-size-normal">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -16,8 +16,8 @@
             "background-light": "#F8FAFC",
             "surface-light": "#FFFFFF",
             "text-light": "#334155",
-            "text-muted-light": "#64748B",
-            "border-light": "#E2E8F0",
+            "text-muted-light": "#475569",
+            "border-light": "#CBD5E1",
             "danger-light": "#FEE2E2",
             "danger-text-light": "#B91C1C",
             "success-light": "#D1FAE5",
@@ -33,10 +33,10 @@
   <link rel="stylesheet" href="assets/css/common.css"/>
   <link rel="stylesheet" href="assets/css/tutorial.css"/>
 </head>
-<body class="bg-background-light text-text-light text-sm font-size-normal" id="body-font-scale">
-  <div class="flex flex-col h-screen">
-    <header class="flex items-center justify-between p-2 border-b bg-surface-light border-border-light">
-      <div class="flex items-center space-x-4">
+<body class="bg-background-light text-text-light text-sm min-h-0">
+  <div class="flex flex-col h-screen min-h-0 overflow-hidden">
+    <header class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-2 border-b bg-surface-light border-border-light shrink-0">
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2 min-w-0">
         <h1 class="text-lg font-semibold text-text-light">Intelligent Morphology Review Platform</h1>
         <div class="flex space-x-2 text-sm text-text-muted-light">
           <a class="hover:text-primary" href="index.html">首頁</a>
@@ -46,7 +46,7 @@
           <button type="button" class="hover:text-primary focus:outline-none bg-transparent border-0 cursor-pointer text-inherit" id="btn-tutorial" title="使用教學">使用教學</button>
         </div>
       </div>
-      <div class="flex items-center space-x-2">
+      <div class="flex items-center space-x-2 shrink-0">
         <button type="button" class="p-2 rounded hover:bg-gray-100" title="縮小字型" id="font-smaller"><span class="material-symbols-outlined text-base">remove</span></button>
         <button type="button" class="p-2 rounded hover:bg-gray-100" title="放大字型" id="font-larger"><span class="material-symbols-outlined text-base">add</span></button>
         <button type="button" class="p-2 rounded hover:bg-gray-100" title="系統設定"><span class="material-symbols-outlined">settings</span></button>
@@ -54,8 +54,8 @@
       </div>
     </header>
 
-    <div class="flex flex-grow overflow-hidden" id="tutorial-specimen-full">
-      <main class="flex-grow flex flex-col p-2 space-y-2">
+    <div class="flex flex-grow overflow-hidden min-h-0 min-w-0" id="tutorial-specimen-full">
+      <main class="flex-grow flex flex-col p-2 space-y-2 min-h-0 min-w-0 overflow-hidden">
         <div id="tutorial-area-tl">
         <div class="flex flex-wrap items-center gap-4">
           <div class="flex items-center space-x-2" id="tutorial-mode-tabs">
@@ -70,71 +70,71 @@
           </div>
         </div>
 
-        <div id="filter-panel" class="bg-surface-light p-3 rounded-md border border-border-light hidden">
-          <p class="text-xs font-medium text-text-muted-light mb-2">檢體狀態（勾選要顯示的狀態）</p>
-          <div class="flex flex-wrap gap-4">
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="PLT Check"/> <span class="ml-1 text-xs">PLT Check</span></label>
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="AI Alert"/> <span class="ml-1 text-xs">AI Alert</span></label>
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Follow-up"/> <span class="ml-1 text-xs">Follow-up</span></label>
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Digital Review"/> <span class="ml-1 text-xs">Digital Review</span></label>
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Verified"/> <span class="ml-1 text-xs">Verified</span></label>
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Locked"/> <span class="ml-1 text-xs">Locked</span></label>
+        <div id="filter-panel" class="bg-surface-light border border-border-light filter-row-fixed-font hidden">
+          <p class="font-medium text-text-muted-light filter-panel-title">檢體狀態（勾選要顯示的狀態）</p>
+          <div class="filter-panel-check-row">
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="PLT Check"/> <span class="ml-1">PLT Check</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="AI Alert"/> <span class="ml-1">AI Alert</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Follow-up"/> <span class="ml-1">Follow-up</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Digital Review"/> <span class="ml-1">Digital Review</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Verified"/> <span class="ml-1">Verified</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Locked"/> <span class="ml-1">Locked</span></label>
           </div>
         </div>
 
-        <div class="bg-surface-light p-2 rounded-md border border-border-light" id="tutorial-filter-row">
-          <div class="flex items-end flex-wrap gap-2">
-            <div class="flex-1 min-w-[120px]">
-              <label class="block text-xs font-medium text-text-muted-light" for="analysis-date-start">檢驗日期</label>
-              <div class="flex items-center mt-1 gap-1">
-                <input class="w-full text-xs p-1.5 rounded-md border border-border-light bg-background-light focus:ring-primary focus:border-primary" id="analysis-date-start" type="date" value="2025-08-07"/>
-                <span>-</span>
-                <input class="w-full text-xs p-1.5 rounded-md border border-border-light bg-background-light focus:ring-primary focus:border-primary" id="analysis-date-end" type="date" value="2025-08-07"/>
+        <div class="bg-surface-light border border-border-light filter-row-fixed-font" id="tutorial-filter-row">
+          <div class="filter-row-single-line">
+            <div class="filter-col filter-col-date">
+              <label class="block font-medium text-text-muted-light" for="analysis-date-start">檢驗日期</label>
+              <div class="filter-date-inputs">
+                <input id="analysis-date-start" type="date" value="2025-08-07"/>
+                <span class="shrink-0 text-text-muted-light">-</span>
+                <input id="analysis-date-end" type="date" value="2025-08-07"/>
               </div>
             </div>
-            <div class="flex-1 min-w-[100px]">
-              <label class="block text-xs font-medium text-text-muted-light" for="filter-department">送檢單位</label>
-              <select class="mt-1 block w-full text-xs p-1.5 rounded-md border border-border-light bg-background-light focus:ring-primary focus:border-primary" id="filter-department">
+            <div class="filter-col filter-col-dept">
+              <label class="block font-medium text-text-muted-light" for="filter-department">送檢單位</label>
+              <select class="block w-full box-border" id="filter-department">
                 <option value="">所有單位</option>
               </select>
             </div>
-            <div class="flex-1 min-w-[80px]">
-              <label class="block text-xs font-medium text-text-muted-light" for="filter-machine">機台</label>
-              <select class="mt-1 block w-full text-xs p-1.5 rounded-md border border-border-light bg-background-light focus:ring-primary focus:border-primary" id="filter-machine">
+            <div class="filter-col filter-col-machine">
+              <label class="block font-medium text-text-muted-light" for="filter-machine">機台</label>
+              <select class="block w-full box-border" id="filter-machine">
                 <option value="">所有機台</option>
               </select>
             </div>
-            <div class="flex-1 min-w-[120px]">
-              <label class="block text-xs font-medium text-text-muted-light" for="specimen-search">檢體搜尋</label>
-              <input class="mt-1 block w-full text-xs p-1.5 rounded-md border border-border-light bg-background-light focus:ring-primary focus:border-primary" id="specimen-search" placeholder="檢體 ID 或 病歷號" type="text"/>
+            <div class="filter-col filter-col-search">
+              <label class="block font-medium text-text-muted-light" for="specimen-search">檢體搜尋</label>
+              <input class="block w-full box-border" id="specimen-search" placeholder="檢體 ID 或 病歷號" type="text"/>
             </div>
-            <div class="flex items-center space-x-2 flex-wrap">
-              <button type="button" class="px-4 py-1.5 bg-primary text-white rounded-md text-xs hover:bg-primary/90" id="btn-search">搜尋</button>
-              <label class="inline-flex items-center">
-                <input class="rounded border-gray-300 text-primary shadow-sm focus:ring-primary" type="checkbox" id="exact-match"/>
-                <span class="ml-1 text-xs">僅顯示完全相符項</span>
+            <div class="filter-col filter-col-actions flex flex-nowrap items-center gap-3">
+              <button type="button" id="btn-search">搜尋</button>
+              <label class="inline-flex items-center gap-1 whitespace-nowrap">
+                <input class="rounded border-gray-300 text-primary focus:ring-primary shrink-0" type="checkbox" id="exact-match"/>
+                <span>僅顯示完全相符項</span>
               </label>
             </div>
           </div>
         </div>
         </div>
 
-        <div class="flex-grow overflow-auto bg-surface-light rounded-md border border-border-light" id="tutorial-specimen-list">
-          <table class="w-full text-left">
+        <div class="flex-grow min-h-0 overflow-auto bg-surface-light rounded-md border border-border-light" id="tutorial-specimen-list">
+          <table class="w-full min-w-[720px] text-left">
             <thead class="sticky top-0 bg-gray-50 z-10">
               <tr>
-                <th class="p-2 font-medium text-text-muted-light w-8"><input type="checkbox" id="select-all" title="全選"/></th>
-                <th class="p-2 font-medium text-text-muted-light">狀態</th>
-                <th class="p-2 font-medium text-text-muted-light sortable sort-urgency" data-sort="urgency" title="依時效排序"><span>時效</span> <span class="sort-icon sort-icon-asc material-symbols-outlined text-xs align-middle">arrow_drop_up</span><span class="sort-icon sort-icon-desc material-symbols-outlined text-xs align-middle hidden">arrow_drop_down</span></th>
-                <th class="p-2 font-medium text-text-muted-light sortable sort-id" data-sort="id" title="依檢體 ID 後五碼排序"><span>檢體 ID</span> <span class="sort-icon sort-icon-asc material-symbols-outlined text-xs align-middle">arrow_drop_up</span><span class="sort-icon sort-icon-desc material-symbols-outlined text-xs align-middle hidden">arrow_drop_down</span></th>
-                <th class="p-2 font-medium text-text-muted-light">病歷號</th>
-                <th class="p-2 font-medium text-text-muted-light">姓名</th>
-                <th class="p-2 font-medium text-text-muted-light">檢體來源</th>
-                <th class="p-2 font-medium text-text-muted-light">操作機台</th>
-                <th class="p-2 font-medium text-text-muted-light">檢體歸位</th>
-                <th class="p-2 font-medium text-text-muted-light sortable sort-time" data-sort="time" title="依分析時間排序"><span>分析時間</span> <span class="sort-icon sort-icon-asc material-symbols-outlined text-xs align-middle">arrow_drop_up</span><span class="sort-icon sort-icon-desc material-symbols-outlined text-xs align-middle hidden">arrow_drop_down</span></th>
-                <th class="p-2 font-medium text-text-muted-light">編輯人員</th>
-                <th class="p-2 font-medium text-text-muted-light w-24">操作</th>
+                <th class="p-2 font-semibold text-text-muted-light w-8"><input type="checkbox" id="select-all" title="全選"/></th>
+                <th class="p-2 font-semibold text-text-muted-light">狀態</th>
+                <th class="p-2 font-semibold text-text-muted-light sortable sort-urgency" data-sort="urgency" title="依時效排序"><span>時效</span> <span class="sort-icon sort-icon-asc material-symbols-outlined text-xs align-middle">arrow_drop_up</span><span class="sort-icon sort-icon-desc material-symbols-outlined text-xs align-middle hidden">arrow_drop_down</span></th>
+                <th class="p-2 font-semibold text-text-muted-light sortable sort-id" data-sort="id" title="依檢體 ID 後五碼排序"><span>檢體 ID</span> <span class="sort-icon sort-icon-asc material-symbols-outlined text-xs align-middle">arrow_drop_up</span><span class="sort-icon sort-icon-desc material-symbols-outlined text-xs align-middle hidden">arrow_drop_down</span></th>
+                <th class="p-2 font-semibold text-text-muted-light">病歷號</th>
+                <th class="p-2 font-semibold text-text-muted-light">姓名</th>
+                <th class="p-2 font-semibold text-text-muted-light">檢體來源</th>
+                <th class="p-2 font-semibold text-text-muted-light">操作機台</th>
+                <th class="p-2 font-semibold text-text-muted-light">檢體歸位</th>
+                <th class="p-2 font-semibold text-text-muted-light sortable sort-time" data-sort="time" title="依分析時間排序"><span>分析時間</span> <span class="sort-icon sort-icon-asc material-symbols-outlined text-xs align-middle">arrow_drop_up</span><span class="sort-icon sort-icon-desc material-symbols-outlined text-xs align-middle hidden">arrow_drop_down</span></th>
+                <th class="p-2 font-semibold text-text-muted-light">編輯人員</th>
+                <th class="p-2 font-semibold text-text-muted-light w-24">操作</th>
               </tr>
             </thead>
             <tbody id="specimen-tbody" class="divide-y divide-border-light"></tbody>
@@ -142,8 +142,8 @@
         </div>
       </main>
 
-      <aside class="w-1/3 flex-shrink-0 flex flex-col p-2 border-l border-border-light bg-background-light min-w-[280px]" id="tutorial-sidebar-overview">
-        <div class="bg-surface-light p-3 rounded-md border border-border-light flex-grow flex flex-col overflow-y-auto">
+      <aside class="w-1/3 flex-shrink-0 flex flex-col p-2 border-l border-border-light bg-background-light min-w-[280px] min-h-0 overflow-hidden" id="tutorial-sidebar-overview">
+        <div class="bg-surface-light p-3 rounded-md border border-border-light flex-grow flex flex-col min-h-0 overflow-y-auto overflow-x-auto">
           <div class="flex-shrink-0" id="tutorial-sidebar-header">
             <div class="flex justify-between items-center mb-4">
               <h3 class="text-base font-semibold">檢體總覽</h3>
@@ -164,10 +164,10 @@
                   <table class="w-full border-collapse">
                     <thead>
                       <tr class="bg-gray-50">
-                        <th class="p-2 font-medium text-left text-text-muted-light">Metric</th>
-                        <th class="p-2 font-medium text-left text-text-muted-light">流式計數</th>
-                        <th class="p-2 font-medium text-left text-text-muted-light">AI</th>
-                        <th class="p-2 font-medium text-left text-text-muted-light">前次報告</th>
+                        <th class="p-2 font-semibold text-left text-text-muted-light">Metric</th>
+                        <th class="p-2 font-semibold text-left text-text-muted-light">流式計數</th>
+                        <th class="p-2 font-semibold text-left text-text-muted-light">AI</th>
+                        <th class="p-2 font-semibold text-left text-text-muted-light">前次報告</th>
                       </tr>
                     </thead>
                     <tbody id="sidebar-metrics" class="divide-y divide-border-light"></tbody>
@@ -181,7 +181,7 @@
       </aside>
     </div>
 
-    <footer class="flex justify-between items-center p-2 border-t border-border-light bg-surface-light text-xs text-text-muted-light">
+    <footer class="flex flex-wrap justify-between items-center gap-y-1 p-2 border-t border-border-light bg-surface-light text-xs text-text-muted-light shrink-0">
       <span id="footer-status">就緒</span>
     </footer>
   </div>
@@ -196,7 +196,7 @@
       var currentMode = null;
       var sortKey = 'time';
       var sortAsc = false;
-      var fontLevel = 1;
+      var fontLevel = typeof initAppFontLevel === 'function' ? initAppFontLevel() : 1;
 
       function setDefaultDateToday() {
         var today = '2025-08-07';
@@ -481,7 +481,7 @@
           var highlight = shouldHighlightMetric(label, aiValue) || shouldHighlightMetric(label, prevValue);
           var rowClass = highlight ? 'bg-danger-light/30' : '';
           var cellClass = highlight ? 'font-bold text-danger-text-light' : '';
-          return '<tr class="' + rowClass + '"><td class="p-2 font-medium text-text-muted-light">' + label + '</td><td class="p-2">' + (r[1] || '-') + '</td><td class="p-2 ' + cellClass + '">' + (aiValue || '-') + '</td><td class="p-2 ' + cellClass + '">' + (prevValue || '-') + '</td></tr>';
+          return '<tr class="' + rowClass + '"><td class="p-2 font-semibold text-text-muted-light">' + label + '</td><td class="p-2">' + (r[1] || '-') + '</td><td class="p-2 ' + cellClass + '">' + (aiValue || '-') + '</td><td class="p-2 ' + cellClass + '">' + (prevValue || '-') + '</td></tr>';
         }).join('');
       }
 
@@ -533,16 +533,10 @@
       document.getElementById('filter-machine').addEventListener('change', renderTable);
 
       document.getElementById('font-smaller').addEventListener('click', function () {
-        fontLevel = Math.max(0, fontLevel - 1);
-        var body = document.getElementById('body-font-scale');
-        body.classList.remove('font-size-small', 'font-size-normal', 'font-size-large');
-        body.classList.add(['font-size-small', 'font-size-normal', 'font-size-large'][fontLevel]);
+        if (typeof adjustAppFontLevel === 'function') fontLevel = adjustAppFontLevel(-1);
       });
       document.getElementById('font-larger').addEventListener('click', function () {
-        fontLevel = Math.min(2, fontLevel + 1);
-        var body = document.getElementById('body-font-scale');
-        body.classList.remove('font-size-small', 'font-size-normal', 'font-size-large');
-        body.classList.add(['font-size-small', 'font-size-normal', 'font-size-large'][fontLevel]);
+        if (typeof adjustAppFontLevel === 'function') fontLevel = adjustAppFontLevel(1);
       });
 
       if (typeof APP_DATABASE !== 'undefined') {

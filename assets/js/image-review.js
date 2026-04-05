@@ -240,7 +240,7 @@
       if (addFlag && !document.querySelector('#sidebar-status-tags + .relative')) {
         var wrap = document.createElement('div');
         wrap.className = 'relative dropdown-container';
-        wrap.innerHTML = '<button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-gray-500 text-[10px] font-medium hover:bg-gray-50" id="add-flag-btn"><span class="material-symbols-outlined text-sm">add</span> Add Flag</button><div class="dropdown-menu absolute left-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50 hidden"><div class="p-2 border-b border-gray-100"><span class="text-[10px] font-bold text-gray-400 uppercase">新增標記</span></div><div class="p-1"><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="AI Alert">AI Alert</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="PLT Check">PLT Check</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Follow-up">Follow-up</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Digital Review">Digital Review</button></div></div></div>';
+        wrap.innerHTML = '<button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-gray-600 text-[10px] font-medium hover:bg-gray-50" id="add-flag-btn"><span class="material-symbols-outlined text-sm">add</span> Add Flag</button><div class="dropdown-menu absolute left-0 top-full mt-2 w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-50 hidden"><div class="p-2 border-b border-gray-200"><span class="text-[10px] font-bold text-gray-500 uppercase">新增標記</span></div><div class="p-1"><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="AI Alert">AI Alert</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="PLT Check">PLT Check</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Follow-up">Follow-up</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Digital Review">Digital Review</button></div></div></div>';
         tagsContainer.parentNode.insertBefore(wrap, tagsContainer.nextSibling);
       }
       tagsContainer.querySelectorAll('[data-status]').forEach(function (el) {
@@ -312,13 +312,13 @@
     var tableContainer = document.getElementById('sidebar-analysis-table');
     if (tableContainer) {
       var rows = getAnalysisTableRows(specimen);
-      var header = '<div class="grid grid-cols-4 gap-2 font-medium text-gray-500 py-1.5 border-b border-gray-200/80 sticky top-0 bg-card z-[1] text-[10px] uppercase tracking-wider">' +
+      var header = '<div class="grid grid-cols-4 gap-2 font-semibold text-gray-600 py-1.5 border-b border-gray-300/80 sticky top-0 bg-card z-[1] text-[10px] uppercase tracking-wider">' +
         '<div class="col-span-1">Cell Type</div><div class="col-span-1 text-right">Flow Cyt.</div><div class="col-span-1 text-right">AI</div><div class="col-span-1 text-right">Prev.</div></div>';
       var body = rows.map(function (r) {
         var label = r[0];
         var aiVal = r[2];
         var highlight = shouldHighlightAnalysisRow(label, aiVal);
-        var rowClass = highlight ? 'bg-red-50 border-b border-red-100' : 'border-b border-gray-100';
+        var rowClass = highlight ? 'bg-red-50 border-b border-red-100' : 'border-b border-gray-200';
         var labelClass = highlight ? 'text-red-700 font-semibold px-0.5' : 'text-gray-600 font-medium leading-tight';
         var valClass = highlight ? 'font-bold text-red-600' : 'text-gray-800';
         var flowClass = highlight ? 'text-gray-400' : 'text-gray-800';
@@ -409,9 +409,9 @@
       var isAbnormal = ABNORMAL_ORDER.indexOf(catName) >= 0;
       var overThreshold = false;
       if (isAbnormal && thresholdPct[catName] !== undefined) overThreshold = thresholdPct[catName] === 0 ? count > 0 : pct >= thresholdPct[catName];
-      var sectionClass = isAbnormal ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-200';
+      var sectionClass = isAbnormal ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-300';
       var titleClass = overThreshold ? 'text-red-800' : (isAbnormal ? 'text-red-800' : 'text-gray-800');
-      var subClass = overThreshold ? 'text-red-600' : (isAbnormal ? 'text-red-600/70' : 'text-gray-500');
+      var subClass = overThreshold ? 'text-red-600' : (isAbnormal ? 'text-red-600/70' : 'text-gray-600');
       html += '<div class="group section-card ' + sectionClass + ' rounded-xl overflow-hidden" data-category="' + catName + '">';
       html += '<div class="flex items-center justify-between p-4 cursor-pointer hover:opacity-90 transition-colors section-header" onclick="window.imageReviewToggleGrid(this)">';
       html += '<div class="flex items-center gap-3">';
@@ -699,6 +699,8 @@
   };
 
   function init() {
+    if (typeof window.initAppFontLevel === 'function') window.initAppFontLevel();
+
     try {
       currentSpecimenId = (typeof window.getSpecimenIdFromUrl === 'function') ? window.getSpecimenIdFromUrl() : '';
     } catch (e) { currentSpecimenId = ''; }
@@ -750,6 +752,15 @@
     }
     if (zoomIn) zoomIn.addEventListener('click', function () { updateZoom(10); });
     if (zoomOut) zoomOut.addEventListener('click', function () { updateZoom(-10); });
+
+    var fontSmaller = document.getElementById('font-smaller');
+    var fontLarger = document.getElementById('font-larger');
+    if (fontSmaller && typeof window.adjustAppFontLevel === 'function') {
+      fontSmaller.addEventListener('click', function () { window.adjustAppFontLevel(-1); });
+    }
+    if (fontLarger && typeof window.adjustAppFontLevel === 'function') {
+      fontLarger.addEventListener('click', function () { window.adjustAppFontLevel(1); });
+    }
 
     var reportClose = document.getElementById('report-issue-close');
     var reportModal = document.getElementById('report-issue-modal');

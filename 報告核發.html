@@ -1,4 +1,4 @@
-<html class="light" lang="zh-TW"><head>
+<html class="light font-size-normal" lang="zh-TW"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>數據核發確認介面</title>
@@ -36,19 +36,20 @@
         }
         .tabular { font-variant-numeric: tabular-nums; }
 </style>
+<link rel="stylesheet" href="assets/css/common.css"/>
 <link rel="stylesheet" href="assets/css/tutorial.css"/>
 </head>
-<body class="bg-background-light font-display h-screen flex items-center justify-center overflow-hidden p-2">
-<div class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-2">
-<div class="bg-white w-full max-w-[1150px] h-auto max-h-[98vh] overflow-hidden rounded-xl shadow-2xl flex flex-col border border-zinc-200">
+<body class="bg-background-light font-display h-screen min-h-0 flex items-center justify-center overflow-hidden p-2">
+<div class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-2 min-h-0 overflow-y-auto">
+<div class="bg-white w-full max-w-[1150px] h-auto max-h-[min(98vh,100%)] min-h-0 overflow-hidden rounded-xl shadow-2xl flex flex-col border border-zinc-300 my-auto">
 <div id="tutorial-report-tl">
-<div class="flex items-center justify-between px-6 py-3 border-b border-zinc-100 shrink-0">
+<div class="flex items-center justify-between px-6 py-3 border-b border-zinc-200 shrink-0">
 <div class="flex items-center gap-3">
 <h1 id="report-specimen-id" class="text-[#101619] text-xl font-black leading-tight tracking-tight tabular-nums"></h1>
 <div id="report-status-tags" class="flex flex-wrap items-center gap-2"></div>
 </div>
 <button type="button" class="flex items-center justify-center rounded-full h-8 w-8 hover:bg-zinc-100 transition-colors" id="btn-close" title="關閉">
-<span class="material-symbols-outlined text-zinc-500 text-xl">close</span>
+<span class="material-symbols-outlined text-zinc-600 text-xl">close</span>
 </button>
 </div>
 <div id="risk-banner" class="px-6 py-2.5 flex items-center justify-between gap-4 shrink-0">
@@ -58,24 +59,24 @@
 </div>
 </div>
 </div>
-<div class="flex-1 overflow-hidden p-4 grid grid-cols-1 md:grid-cols-12 gap-5 min-h-0">
-<div id="tutorial-report-bl" class="md:col-span-7 flex flex-col gap-2 h-full overflow-hidden">
+<div class="flex-1 min-h-0 overflow-hidden p-4 grid grid-cols-1 md:grid-cols-12 gap-5">
+<div id="tutorial-report-bl" class="md:col-span-7 flex flex-col gap-2 min-h-0 h-full max-h-full overflow-hidden">
 <div class="flex items-center justify-between shrink-0">
 <h3 class="text-[#101619] dark:text-zinc-200 text-[11px] font-bold uppercase tracking-[0.15em] flex items-center gap-2">
 <span class="material-symbols-outlined text-primary text-lg">science</span>
                             血球分類計數 (WBC)
                         </h3>
 </div>
-<div class="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-900 shadow-sm flex-grow flex flex-col min-h-0">
-<div class="flex-grow overflow-y-auto">
+<div class="rounded-xl border border-zinc-300 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-900 shadow-sm flex-grow flex flex-col min-h-0">
+<div class="flex-grow min-h-0 overflow-y-auto overflow-x-auto overscroll-contain">
 <table class="w-full text-left border-collapse min-w-full">
 <thead class="sticky top-0 z-10">
 <tr class="bg-zinc-50 dark:bg-zinc-800/90 backdrop-blur-sm">
-<th class="px-4 py-2 text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">細胞類型</th>
-<th class="px-2 py-2 text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right">流式計數(%)</th>
-<th class="px-2 py-2 text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right">AI(%)</th>
+<th class="px-4 py-2 text-zinc-600 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">細胞類型</th>
+<th class="px-2 py-2 text-zinc-600 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right">流式計數(%)</th>
+<th class="px-2 py-2 text-zinc-600 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right">AI(%)</th>
 <th class="px-2 py-2 text-blue-700 dark:text-blue-400 text-xs font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right bg-blue-50/50 dark:bg-blue-900/20">人員編輯(%)</th>
-<th class="px-2 py-2 text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right">前次報告(%)</th>
+<th class="px-2 py-2 text-zinc-600 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800 text-right">前次報告(%)</th>
 </tr>
 </thead>
 <tbody id="wbc-table-body" class="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -84,40 +85,40 @@
 </div>
 </div>
 </div>
-<div class="md:col-span-5 flex flex-col gap-4 overflow-y-auto">
+<div class="md:col-span-5 flex flex-col gap-4 min-h-0 overflow-y-auto overscroll-contain">
 <div id="tutorial-report-tr" class="flex flex-col gap-2 shrink-0">
 <h3 class="text-[#101619] dark:text-zinc-200 text-[11px] font-bold flex items-center gap-2 uppercase tracking-wide">
 <span class="material-symbols-outlined text-primary text-lg">patient_list</span>
                             病患資訊
                         </h3>
-<div class="bg-white dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
+<div class="bg-white dark:bg-zinc-800/40 rounded-xl border border-zinc-300 dark:border-zinc-800 overflow-hidden shadow-sm">
 <div class="grid grid-cols-2 p-3 gap-x-4 gap-y-2">
 <div class="col-span-2 pb-1 border-b border-zinc-200 dark:border-zinc-700 flex flex-col gap-0.5">
-<span class="text-zinc-500 text-[9px] tracking-wider font-bold">檢體編號</span>
+<span class="text-zinc-600 text-[9px] tracking-wider font-bold">檢體編號</span>
 <span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">H5080720647</span>
 </div>
 <div class="flex flex-col gap-0.5">
-<span class="text-zinc-500 text-[9px] tracking-wider font-bold">病歷號</span>
+<span class="text-zinc-600 text-[9px] tracking-wider font-bold">病歷號</span>
 <span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">12701633</span>
 </div>
 <div class="flex flex-col gap-0.5">
-<span class="text-zinc-500 text-[9px] tracking-wider font-bold">姓名 (性別)</span>
+<span class="text-zinc-600 text-[9px] tracking-wider font-bold">姓名 (性別)</span>
 <span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold">王O玲 (女)</span>
 </div>
 <div class="flex flex-col gap-0.5">
-<span class="text-zinc-500 text-[9px] tracking-wider font-bold">生日 (年齡)</span>
+<span class="text-zinc-600 text-[9px] tracking-wider font-bold">生日 (年齡)</span>
 <span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">1995-08-15 (30 歲)</span>
 </div>
 <div class="flex flex-col gap-0.5">
-<span class="text-zinc-500 text-[9px] tracking-wider font-bold">檢體來源</span>
+<span class="text-zinc-600 text-[9px] tracking-wider font-bold">檢體來源</span>
 <span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold">一般科</span>
 </div>
 <div class="flex flex-col gap-0.5">
-<span class="text-zinc-500 text-[9px] tracking-wider font-bold">操作機台</span>
+<span class="text-zinc-600 text-[9px] tracking-wider font-bold">操作機台</span>
 <span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold uppercase">DI2</span>
 </div>
 <div class="flex flex-col gap-0.5">
-<span class="text-zinc-500 text-[9px] tracking-wider font-bold">檢體歸位</span>
+<span class="text-zinc-600 text-[9px] tracking-wider font-bold">檢體歸位</span>
 <span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">134-5</span>
 </div>
 </div>
@@ -129,15 +130,15 @@
 <span class="material-symbols-outlined text-primary text-lg">magnification_small</span>
                             其他發現
                         </h3>
-<div class="bg-white dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
+<div class="bg-white dark:bg-zinc-800/40 rounded-xl border border-zinc-300 dark:border-zinc-800 overflow-hidden shadow-sm">
 <table class="w-full text-left border-collapse">
 <thead>
 <tr class="bg-zinc-50/50 dark:bg-zinc-800/50">
-<th class="px-3 py-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-700">項目</th>
-<th class="px-2 py-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-700 text-right">流式計數</th>
-<th class="px-2 py-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-700 text-right">AI</th>
-<th class="px-2 py-1.5 text-blue-700 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-700 text-right bg-blue-50/50 dark:bg-blue-900/20">人員編輯</th>
-<th class="px-2 py-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-700 text-right">前次報告</th>
+<th class="px-3 py-1.5 text-zinc-600 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-700">項目</th>
+<th class="px-2 py-1.5 text-zinc-600 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-700 text-right">流式計數</th>
+<th class="px-2 py-1.5 text-zinc-600 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-700 text-right">AI</th>
+<th class="px-2 py-1.5 text-blue-700 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-700 text-right bg-blue-50/50 dark:bg-blue-900/20">人員編輯</th>
+<th class="px-2 py-1.5 text-zinc-600 dark:text-zinc-400 text-[10px] font-bold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-700 text-right">前次報告</th>
 </tr>
 </thead>
 <tbody id="other-table-body" class="divide-y divide-zinc-50 dark:divide-zinc-800">
@@ -150,38 +151,38 @@
 <span class="material-symbols-outlined text-primary text-lg">analytics</span>
                             CBC 數值
                         </h3>
-<div class="bg-white dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm p-3">
+<div class="bg-white dark:bg-zinc-800/40 rounded-xl border border-zinc-300 dark:border-zinc-800 overflow-hidden shadow-sm p-3">
 <div class="grid grid-cols-4 gap-y-3 gap-x-2">
 <div class="flex flex-col">
-<span class="text-zinc-500 text-[9px] font-bold uppercase tracking-tight">WBC</span>
+<span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">WBC</span>
 <span id="cbc-wbc" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
 </div>
 <div class="flex flex-col">
-<span class="text-zinc-500 text-[9px] font-bold uppercase tracking-tight">RBC</span>
+<span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">RBC</span>
 <span id="cbc-rbc" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
 </div>
 <div class="flex flex-col">
-<span class="text-zinc-500 text-[9px] font-bold uppercase tracking-tight">Hb</span>
+<span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">Hb</span>
 <span id="cbc-hb" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
 </div>
 <div class="flex flex-col">
-<span class="text-zinc-500 text-[9px] font-bold uppercase tracking-tight">HCT</span>
+<span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">HCT</span>
 <span id="cbc-hct" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
 </div>
 <div class="flex flex-col">
-<span class="text-zinc-500 text-[9px] font-bold uppercase tracking-tight">MCV</span>
+<span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">MCV</span>
 <span id="cbc-mcv" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
 </div>
 <div class="flex flex-col">
-<span class="text-zinc-500 text-[9px] font-bold uppercase tracking-tight">MCH</span>
+<span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">MCH</span>
 <span id="cbc-mch" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
 </div>
 <div class="flex flex-col">
-<span class="text-zinc-500 text-[9px] font-bold uppercase tracking-tight">MCHC</span>
+<span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">MCHC</span>
 <span id="cbc-mchc" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
 </div>
 <div class="flex flex-col">
-<span class="text-zinc-500 text-[9px] font-bold uppercase tracking-tight">PLT</span>
+<span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">PLT</span>
 <span id="cbc-plt" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
 </div>
 </div>
@@ -194,8 +195,8 @@
 <div class="flex items-center gap-2">
 <span class="material-symbols-outlined text-zinc-400 text-[20px]">account_circle</span>
 <div class="flex items-center gap-1.5">
-<span class="text-zinc-500 text-xs">當前操作者：</span>
-<span class="text-zinc-700 dark:text-zinc-300 text-xs font-bold">王小明 <span class="font-normal text-zinc-500">(M12345)</span></span>
+<span class="text-zinc-600 text-xs">當前操作者：</span>
+<span class="text-zinc-700 dark:text-zinc-300 text-xs font-bold">王小明 <span class="font-normal text-zinc-600">(M12345)</span></span>
 </div>
 </div>
 <div class="flex items-center gap-3">
