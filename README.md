@@ -54,12 +54,17 @@
   - 機台 (DI1 / DI2)
   - 檢體 ID / 病歷號（可選擇完全相符或模糊搜尋）
   - 狀態（Digital Review / PLT Check / AI Alert / Follow-up / Verified）
+- **模式與條件記憶**：
+  - 點選 `數位閱片` / `實體作業` 會套用模式預設狀態；再點一次同模式可回到全選狀態。
+  - 模式、狀態勾選、日期、單位、機台、搜尋字串、排序條件皆會保存，返回檢體管理後自動還原。
 - **列表操作**：
   - 單擊一列：右側「檢體總覽」顯示該檢體的病歷號、姓名、生日、科別與 WBC 差異表。
   - 雙擊一列或點「進入閱片」按鈕：帶著該檢體 ID 進入 `影像檢視與細胞編輯.html?specimen=ID`。
 - **狀態膠囊**：
   - 依 `database.js` 中 `status` 陣列動態產生，例如 `PLT Check`、`Digital Review`、`AI Alert` 等。
-  - `statusDone === true` 時（已在報告核發簽核完），會以 **綠色＋打勾** 標示。
+  - 完成狀態改為分流：`workflowDone.digitalReview`（數位流程）與 `workflowDone.entityReview`（實體流程）。
+  - 在檢體管理可直接點擊實體狀態膠囊（PLT Check / Follow-up / AI Alert / Manual Alert）標記完成；該檢體所有實體狀態都完成時，會自動視為實體流程完成。
+  - 只有「數位 + 實體」皆完成時才視為整體完成（Verified）。
 
 ### 3. 影像檢視與細胞編輯 (`影像檢視與細胞編輯.html`)
 
@@ -88,7 +93,8 @@
 
 - **頂部標題列**：
   - 僅顯示：檢體編號 `H5080xxxxx` ＋ 目前狀態膠囊（如 Digital Review / PLT Check 等）。
-  - 若該檢體已被簽核（含 `Verified`），`Digital Review` 會變成 **綠色＋打勾** 的樣式。
+  - `Digital Review` 是否顯示綠色打勾，取決於 `workflowDone.digitalReview`。
+  - 實體相關狀態是否顯示綠色打勾，取決於 `workflowDone.entityStatusDone` / `workflowDone.entityReview`。
 - **風險警示橫幅**（紅 / 綠）：
   - 根據人員編輯或 AI 數據與門檻 `LEAVE_THRESHOLDS`：
     - **紅色**：已達留單標準（任一留單條件成立，如 WBC/分類百分比閾值，或 Blast / Promyelocyte / Promonocyte / Plasma cell / Abnormal lymphocyte present 等），簽核前請確認是否需人工鏡檢或留單。
@@ -112,13 +118,15 @@
 
 - **簽核行為**：
   - 按「確認並簽核」：
-    - 先跳出簡單確認視窗。
-    - 通過後，透過 `postMessage` 回傳 `reportVerified` 事件給外層影像檢視頁。
+    - 不再跳出二次確認視窗，直接送出。
+    - 透過 `postMessage` 回傳 `reportVerified` 事件給外層影像檢視頁。
     - 外層會：
-      - 將該檢體 `status` 加上 `'Verified'`，並設定 `statusDone = true`。
-      - 更新左側狀態膠囊（Digital Review 變綠色＋打勾）。
-      - 從 Digital Review 清單中移除該檢體。
+      - 標記該檢體 `workflowDone.digitalReview = true`（只完成數位流程，不會強制完成實體流程）。
+      - 更新狀態膠囊（Digital Review 轉為綠色＋打勾）。
+      - 從「數位閱片待辦」清單中移除該檢體（若仍有實體待辦，會留在實體作業模式）。
       - 關閉報告核發 overlay，導回 `檢體管理.html`。
+- **關閉行為**：
+  - 報告核發視窗以右上角 `X` 關閉（已移除下方取消按鈕）。
 
 > 目前沒有真正呼叫 LIS API，上述簽核流程是前端模擬；未來可在 `report-issue.js` 內補上實際 API 呼叫，再於成功後送出 `postMessage`。
 
@@ -146,6 +154,10 @@
   - `goToImageReview()` / `goToReportIssue()` / `goToSpecimenList()`：統一處理頁面間導頁。
   - `getSpecimenById()`：從 `MOCK_SPECIMENS`（由資料庫拷貝）中找到對應檢體。
   - `LEAVE_THRESHOLDS` / `parseMetricNum()` / `isAbnormalMetricValue()`：留單門檻與異常判定，與影像側欄分析表、報告核發橫幅共用。
+  - `workflowDone` 分流狀態工具：
+    - `isDigitalReviewDone()`：判斷數位流程是否完成。
+    - `isEntityReviewDone()` / `isEntityStatusCompleted()`：判斷實體流程與各實體狀態是否完成。
+    - `isSpecimenWorkflowCompleted()`：判斷整體是否完成（數位 + 實體皆完成）。
 
 ---
 

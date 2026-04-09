@@ -278,16 +278,25 @@ var ENTITY_REVIEW_STATUS_SET = ['PLT Check', 'Follow-up', 'AI Alert', 'Manual Al
 function normalizeWorkflowDone(rawWorkflow, rawStatusDone) {
   var digitalReview = false;
   var entityReview = false;
+  var entityStatusDone = {};
   if (rawWorkflow && typeof rawWorkflow === 'object') {
     digitalReview = !!rawWorkflow.digitalReview;
     entityReview = !!rawWorkflow.entityReview;
+    if (rawWorkflow.entityStatusDone && typeof rawWorkflow.entityStatusDone === 'object') {
+      ENTITY_REVIEW_STATUS_SET.forEach(function (k) {
+        if (rawWorkflow.entityStatusDone[k] !== undefined) {
+          entityStatusDone[k] = !!rawWorkflow.entityStatusDone[k];
+        }
+      });
+    }
   }
   if (rawStatusDone) {
     // 舊版 statusDone 視為整體完成，兩條流程都視為已完成
     digitalReview = true;
     entityReview = true;
+    ENTITY_REVIEW_STATUS_SET.forEach(function (k) { entityStatusDone[k] = true; });
   }
-  return { digitalReview: digitalReview, entityReview: entityReview };
+  return { digitalReview: digitalReview, entityReview: entityReview, entityStatusDone: entityStatusDone };
 }
 
 function normalizeStatusStorageEntry(raw) {
@@ -332,13 +341,24 @@ function isEntityReviewDone(spec) {
   if (!spec) return false;
   if (!hasAnyEntityReviewTask(spec)) return true;
   var wf = normalizeWorkflowDone(spec.workflowDone, spec.statusDone);
+  var st = spec.status || [];
+  var hasPartial = false;
+  for (var i = 0; i < st.length; i++) {
+    var key = st[i];
+    if (ENTITY_REVIEW_STATUS_SET.indexOf(key) === -1) continue;
+    hasPartial = true;
+    if (!wf.entityStatusDone || wf.entityStatusDone[key] !== true) return false;
+  }
+  if (hasPartial) return true;
   return !!wf.entityReview;
 }
 
 function isEntityStatusCompleted(spec, statusKey) {
   if (!spec) return false;
   if (ENTITY_REVIEW_STATUS_SET.indexOf(statusKey) === -1) return false;
-  return isEntityReviewDone(spec);
+  var wf = normalizeWorkflowDone(spec.workflowDone, spec.statusDone);
+  if (wf.entityStatusDone && wf.entityStatusDone[statusKey] !== undefined) return !!wf.entityStatusDone[statusKey];
+  return !!wf.entityReview;
 }
 
 function persistSpecimenStatusOverride(specimenId, statusArray, options) {
@@ -354,9 +374,25 @@ function persistSpecimenStatusOverride(specimenId, statusArray, options) {
     var nextStatus = Array.isArray(statusArray) ? statusArray.slice().filter(function (x) { return x !== 'Verified'; }) : [];
     var workflowInput = prev.workflowDone;
     if (options && options.workflowDone && typeof options.workflowDone === 'object') {
+      var prevEntityStatusDone = (prev.workflowDone && prev.workflowDone.entityStatusDone) ? prev.workflowDone.entityStatusDone : {};
+      var nextEntityStatusDone = {};
+      if (options.workflowDone.entityStatusDone && typeof options.workflowDone.entityStatusDone === 'object') {
+        ENTITY_REVIEW_STATUS_SET.forEach(function (k) {
+          if (options.workflowDone.entityStatusDone[k] !== undefined) {
+            nextEntityStatusDone[k] = !!options.workflowDone.entityStatusDone[k];
+          } else if (prevEntityStatusDone[k] !== undefined) {
+            nextEntityStatusDone[k] = !!prevEntityStatusDone[k];
+          }
+        });
+      } else {
+        ENTITY_REVIEW_STATUS_SET.forEach(function (k) {
+          if (prevEntityStatusDone[k] !== undefined) nextEntityStatusDone[k] = !!prevEntityStatusDone[k];
+        });
+      }
       workflowInput = {
         digitalReview: options.workflowDone.digitalReview !== undefined ? options.workflowDone.digitalReview : prev.workflowDone.digitalReview,
-        entityReview: options.workflowDone.entityReview !== undefined ? options.workflowDone.entityReview : prev.workflowDone.entityReview
+        entityReview: options.workflowDone.entityReview !== undefined ? options.workflowDone.entityReview : prev.workflowDone.entityReview,
+        entityStatusDone: nextEntityStatusDone
       };
     }
     var nextWorkflowDone = normalizeWorkflowDone(

@@ -398,6 +398,9 @@
       function applyFilters() {
         var f = getFilters();
         function statusMatchesSelection(specimen, statusKey) {
+          var st = specimen.status || [];
+          var hasTag = st.indexOf(statusKey) !== -1;
+          if (!hasTag) return false;
           if (statusKey === 'Digital Review' && typeof isDigitalReviewDone === 'function') {
             return !isDigitalReviewDone(specimen);
           }
@@ -405,8 +408,7 @@
               (statusKey === 'PLT Check' || statusKey === 'Follow-up' || statusKey === 'AI Alert' || statusKey === 'Manual Alert')) {
             return !isEntityStatusCompleted(specimen, statusKey);
           }
-          var st = specimen.status || [];
-          return st.indexOf(statusKey) !== -1;
+          return true;
         }
         filteredList = MOCK_SPECIMENS.filter(function (s) {
           if (f.dateStart && s.analysisTime) {
@@ -486,10 +488,10 @@
           if (st === 'Verified') return;
           var style = STATUS_STYLES[st] || 'bg-gray-100 text-gray-800';
           var drCompleted = st === 'Digital Review' && typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(specimen);
-          var fuCompleted = st === 'Follow-up' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(specimen, 'Follow-up');
-          if (drCompleted || fuCompleted) style = 'bg-green-100 text-green-800';
-          html += '<span class="status-capsule ' + style + '">';
-          if (drCompleted || fuCompleted) html += '<span class="material-symbols-outlined text-xs mr-1">check</span>';
+          var entityCompleted = typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(specimen, st);
+          if (drCompleted || entityCompleted) style = 'bg-green-100 text-green-800';
+          html += '<span class="status-capsule ' + style + '" data-status="' + st + '">';
+          if (drCompleted || entityCompleted) html += '<span class="material-symbols-outlined text-xs mr-1">check</span>';
           if (st === 'Locked') html += '<span class="material-symbols-outlined text-xs mr-1">lock</span>';
           html += st + '</span>';
         });
@@ -554,7 +556,39 @@
       document.getElementById('specimen-tbody').addEventListener('click', function (e) {
         var cap = e.target.closest('.status-capsule');
         if (cap) {
-          cap.classList.toggle('status-capsule-done');
+          var tr = cap.closest('tr');
+          var statusKey = cap.getAttribute('data-status');
+          var specimenId = tr ? tr.getAttribute('data-specimen-id') : '';
+          var specimen = specimenId ? getSpecimenById(specimenId) : null;
+          if (!specimen || !statusKey) return;
+          if (statusKey !== 'PLT Check' && statusKey !== 'Follow-up' && statusKey !== 'AI Alert' && statusKey !== 'Manual Alert') return;
+          if (!specimen.workflowDone || typeof specimen.workflowDone !== 'object') {
+            specimen.workflowDone = { digitalReview: false, entityReview: false, entityStatusDone: {} };
+          }
+          if (!specimen.workflowDone.entityStatusDone || typeof specimen.workflowDone.entityStatusDone !== 'object') {
+            specimen.workflowDone.entityStatusDone = {};
+          }
+          var current = !!specimen.workflowDone.entityStatusDone[statusKey];
+          specimen.workflowDone.entityStatusDone[statusKey] = !current;
+          var st = specimen.status || [];
+          var entityStatuses = st.filter(function (x) {
+            return x === 'PLT Check' || x === 'Follow-up' || x === 'AI Alert' || x === 'Manual Alert';
+          });
+          specimen.workflowDone.entityReview = entityStatuses.length > 0 && entityStatuses.every(function (x) {
+            return !!specimen.workflowDone.entityStatusDone[x];
+          });
+          specimen.statusDone = typeof isSpecimenWorkflowCompleted === 'function' ? isSpecimenWorkflowCompleted(specimen) : false;
+          if (typeof persistSpecimenStatusOverride === 'function') {
+            persistSpecimenStatusOverride(specimen.id, specimen.status, { workflowDone: specimen.workflowDone, editor: specimen.editor || '' });
+          }
+          renderTable();
+          if (filteredList.length && currentSpecimenId) {
+            var stillVisible = filteredList.some(function (row) { return row.id === currentSpecimenId; });
+            if (stillVisible) selectRow(currentSpecimenId);
+            else selectRow(filteredList[0].id);
+          } else {
+            updateSidebar(null);
+          }
           e.stopPropagation();
         }
       });
