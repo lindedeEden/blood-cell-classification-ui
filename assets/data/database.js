@@ -800,9 +800,10 @@ var APP_DATABASE = {
       machine: 'DI1',
       location: '132-6',
       analysisTime: '2025-08-07 21:32',
-      editor: '',
+      editor: 'admin',
       status: ['Digital Review'],
-      urgency: 72,
+      statusDone: true,
+      urgency: 0,
       birthDate: '1978-02-14',
       age: 47,
       gender: '男',
@@ -865,9 +866,10 @@ var APP_DATABASE = {
       machine: 'DI2',
       location: '126-1',
       analysisTime: '2025-08-07 21:40',
-      editor: '',
+      editor: 'admin',
       status: ['Digital Review'],
-      urgency: 80,
+      statusDone: true,
+      urgency: 0,
       birthDate: '1955-09-20',
       age: 70,
       gender: '女',
@@ -1215,6 +1217,38 @@ var APP_DATABASE = {
       if (typeof s.metrics[k] === 'undefined') s.metrics[k] = '-';
       if (typeof s.prevReport[k] === 'undefined') s.prevReport[k] = '-';
     });
+  });
+})();
+
+// 補齊前次報告日期：若未提供 prevReportDate，預設為 analysisTime 前 7 天（展示用途）
+(function ensurePrevReportDate() {
+  if (!APP_DATABASE || !Array.isArray(APP_DATABASE.specimens)) return;
+  function parseAnalysisTime(v) {
+    if (!v) return null;
+    var m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+    if (!m) return null;
+    return new Date(
+      parseInt(m[1], 10),
+      parseInt(m[2], 10) - 1,
+      parseInt(m[3], 10),
+      parseInt(m[4] || '0', 10),
+      parseInt(m[5] || '0', 10),
+      0,
+      0
+    );
+  }
+  function fmtDate(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+  APP_DATABASE.specimens.forEach(function (s) {
+    if (s.prevReportDate) return;
+    var at = parseAnalysisTime(s.analysisTime);
+    if (!at) return;
+    var prev = new Date(at.getTime() - (7 * 86400000));
+    s.prevReportDate = fmtDate(prev);
   });
 })();
 

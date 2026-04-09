@@ -4,6 +4,21 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>檢體管理 - 血球型態分類軟體</title>
+  <script>
+    (function () {
+      try {
+        var key = 'blood-morphology-font-level';
+        var classes = ['font-size-small', 'font-size-normal', 'font-size-large', 'font-size-xlarge'];
+        var raw = window.localStorage.getItem(key);
+        var level = parseInt(raw, 10);
+        if (isNaN(level)) level = 1;
+        level = Math.max(0, Math.min(3, level));
+        var root = document.documentElement;
+        classes.forEach(function (c) { root.classList.remove(c); });
+        root.classList.add(classes[level]);
+      } catch (e) {}
+    })();
+  </script>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -49,7 +64,7 @@
       <div class="flex items-center space-x-2 shrink-0">
         <button type="button" class="p-2 rounded hover:bg-gray-100" title="縮小字型" id="font-smaller"><span class="material-symbols-outlined text-base">remove</span></button>
         <button type="button" class="p-2 rounded hover:bg-gray-100" title="放大字型" id="font-larger"><span class="material-symbols-outlined text-base">add</span></button>
-        <button type="button" class="p-2 rounded hover:bg-gray-100" title="系統設定"><span class="material-symbols-outlined">settings</span></button>
+        <button type="button" class="p-2 rounded hover:bg-gray-100" title="系統設定" id="btn-settings"><span class="material-symbols-outlined">settings</span></button>
         <button type="button" class="p-2 rounded hover:bg-gray-100" title="登出"><span class="material-symbols-outlined">power_settings_new</span></button>
       </div>
     </header>
@@ -77,6 +92,7 @@
             <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="AI Alert"/> <span class="ml-1">AI Alert</span></label>
             <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Follow-up"/> <span class="ml-1">Follow-up</span></label>
             <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Digital Review"/> <span class="ml-1">Digital Review</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Manual Alert"/> <span class="ml-1">Manual Alert</span></label>
             <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Verified"/> <span class="ml-1">Verified</span></label>
             <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Locked"/> <span class="ml-1">Locked</span></label>
           </div>
@@ -167,7 +183,7 @@
                         <th class="p-2 font-semibold text-left text-text-muted-light">Metric</th>
                         <th class="p-2 font-semibold text-left text-text-muted-light">流式計數</th>
                         <th class="p-2 font-semibold text-left text-text-muted-light">AI</th>
-                        <th class="p-2 font-semibold text-left text-text-muted-light">前次報告</th>
+                        <th class="p-2 font-semibold text-left text-text-muted-light" id="sidebar-prev-report-header">前次報告</th>
                       </tr>
                     </thead>
                     <tbody id="sidebar-metrics" class="divide-y divide-border-light"></tbody>
@@ -186,8 +202,27 @@
     </footer>
   </div>
 
-  <script src="assets/data/database.js"></script>
-  <script src="assets/js/common.js"></script>
+  <div id="modal-leave-settings" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" aria-modal="true" role="dialog" aria-labelledby="modal-leave-settings-title">
+    <div class="absolute inset-0 bg-black/40" id="modal-leave-settings-backdrop" aria-hidden="true"></div>
+    <div class="relative bg-white rounded-lg shadow-xl border border-border-light max-w-lg w-full max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between p-3 border-b border-border-light shrink-0">
+        <h2 id="modal-leave-settings-title" class="text-base font-semibold text-text-light">留單標準設定</h2>
+        <button type="button" class="p-1 rounded hover:bg-gray-100 text-text-muted-light" id="modal-leave-settings-close" aria-label="關閉">
+          <span class="material-symbols-outlined text-xl">close</span>
+        </button>
+      </div>
+      <p class="px-3 pt-2 text-xs text-text-muted-light leading-relaxed">以下門檻與<strong>影像閱片分析表</strong>、<strong>報告核發風險橫幅</strong>共用。數值型：數值<strong>≥</strong>門檻即視為達留單標準（單位與介面表格一致）。</p>
+      <div class="overflow-y-auto flex-1 p-3 min-h-0" id="modal-leave-settings-body"></div>
+      <div class="flex flex-wrap justify-end gap-2 p-3 border-t border-border-light shrink-0 bg-surface-light">
+        <button type="button" class="px-3 py-1.5 text-sm border border-border-light rounded-md hover:bg-gray-50 text-text-muted-light" id="modal-leave-settings-reset">還原預設</button>
+        <button type="button" class="px-3 py-1.5 text-sm border border-border-light rounded-md hover:bg-gray-50" id="modal-leave-settings-cancel">取消</button>
+        <button type="button" class="px-3 py-1.5 text-sm rounded-md bg-primary text-white hover:opacity-95" id="modal-leave-settings-save">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/data/database.js?v=20260411b"></script>
+  <script src="assets/js/common.js?v=20260411b"></script>
   <script src="assets/js/tutorial.js"></script>
   <script>
     (function () {
@@ -198,12 +233,50 @@
       var sortAsc = false;
       var fontLevel = typeof initAppFontLevel === 'function' ? initAppFontLevel() : 1;
 
+      /** 初始載入預設：不選數位／實體模式；狀態全勾選以顯示完整清單（登入後進入本頁亦同） */
+      var SPECIMEN_LIST_DEMO = {
+        sortKey: 'time',
+        sortAsc: false,
+        /** 未選模式時顯示所有狀態 */
+        statusFiltersAll: ['PLT Check', 'AI Alert', 'Follow-up', 'Digital Review', 'Manual Alert', 'Verified', 'Locked'],
+        demoDate: '2025-08-07'
+      };
+
       function setDefaultDateToday() {
-        var today = '2025-08-07';
+        var d = SPECIMEN_LIST_DEMO.demoDate;
         var start = document.getElementById('analysis-date-start');
         var end = document.getElementById('analysis-date-end');
-        if (start && !start.dataset.initialized) { start.value = today; start.dataset.initialized = '1'; }
-        if (end && !end.dataset.initialized) { end.value = today; end.dataset.initialized = '1'; }
+        if (start) { start.value = d; start.dataset.initialized = '1'; }
+        if (end) { end.value = d; end.dataset.initialized = '1'; }
+      }
+
+      /** mode 為 null 時兩側模式按鈕皆不反白（未預設模式） */
+      function setModeTabVisual(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.mode-tab').forEach(function (t) {
+          t.classList.remove('bg-primary', 'text-white', 'border-primary');
+          t.classList.add('border-border-light', 'bg-surface-light', 'text-text-muted-light');
+          if (mode != null && t.dataset.mode === mode) {
+            t.classList.remove('border-border-light', 'text-text-muted-light', 'bg-surface-light');
+            t.classList.add('bg-primary', 'text-white', 'border-primary');
+          }
+        });
+      }
+
+      function applySpecimenListUiDemoDefaults() {
+        sortKey = SPECIMEN_LIST_DEMO.sortKey;
+        sortAsc = SPECIMEN_LIST_DEMO.sortAsc;
+        setModeTabVisual(null);
+        setStatusFilterCheckboxes(SPECIMEN_LIST_DEMO.statusFiltersAll);
+        var search = document.getElementById('specimen-search');
+        if (search) search.value = '';
+        var em = document.getElementById('exact-match');
+        if (em) em.checked = false;
+        var dep = document.getElementById('filter-department');
+        if (dep) dep.value = '';
+        var mac = document.getElementById('filter-machine');
+        if (mac) mac.value = '';
+        setDefaultDateToday();
       }
 
       function getSelectedStatuses() {
@@ -262,10 +335,18 @@
           if (!hasStatus && !showVerified) return false;
           return true;
         });
+        /** 狀態欄出現打勾（Digital Review／Follow-up 完成綠勾或舊版 Verified）者排最下方 */
+        function specimenStatusShowsCheckmark(s) {
+          if (!s) return false;
+          var st = s.status || [];
+          if (st.indexOf('Verified') >= 0) return true;
+          if (!s.statusDone) return false;
+          return st.indexOf('Digital Review') >= 0 || st.indexOf('Follow-up') >= 0;
+        }
         function isCompleted(s) { return !!(s.statusDone || (s.status && s.status.indexOf('Verified') !== -1)); }
         if (sortKey === 'id') {
           filteredList.sort(function (a, b) {
-            if (isCompleted(a) !== isCompleted(b)) return isCompleted(a) ? 1 : -1;
+            if (specimenStatusShowsCheckmark(a) !== specimenStatusShowsCheckmark(b)) return specimenStatusShowsCheckmark(a) ? 1 : -1;
             var a5 = (a.id || '').slice(-5);
             var b5 = (b.id || '').slice(-5);
             var cmp = a5.localeCompare(b5, undefined, { numeric: true });
@@ -273,7 +354,7 @@
           });
         } else if (sortKey === 'time') {
           filteredList.sort(function (a, b) {
-            if (isCompleted(a) !== isCompleted(b)) return isCompleted(a) ? 1 : -1;
+            if (specimenStatusShowsCheckmark(a) !== specimenStatusShowsCheckmark(b)) return specimenStatusShowsCheckmark(a) ? 1 : -1;
             var ta = (a.analysisTime || '').replace(/-/g, '').replace(/[:\s]/g, '');
             var tb = (b.analysisTime || '').replace(/-/g, '').replace(/[:\s]/g, '');
             var cmp = ta.localeCompare(tb);
@@ -281,9 +362,9 @@
           });
         } else if (sortKey === 'urgency') {
           filteredList.sort(function (a, b) {
-            if (isCompleted(a) !== isCompleted(b)) return isCompleted(a) ? 1 : -1;
-            var ua = Number(a.urgency);
-            var ub = Number(b.urgency);
+            if (specimenStatusShowsCheckmark(a) !== specimenStatusShowsCheckmark(b)) return specimenStatusShowsCheckmark(a) ? 1 : -1;
+            var ua = typeof getSpecimenDisplayUrgency === 'function' ? Number(getSpecimenDisplayUrgency(a)) : Number(a.urgency);
+            var ub = typeof getSpecimenDisplayUrgency === 'function' ? Number(getSpecimenDisplayUrgency(b)) : Number(b.urgency);
             if (isNaN(ua)) ua = 0;
             if (isNaN(ub)) ub = 0;
             var cmp = ua - ub;
@@ -297,11 +378,13 @@
         var html = '';
         var statuses = specimen.status || [];
         statuses.forEach(function (st) {
+          if (st === 'Verified') return;
           var style = STATUS_STYLES[st] || 'bg-gray-100 text-gray-800';
-          var done = specimen.statusDone && st !== 'Locked';
-          if (done) style = 'bg-green-100 text-green-800';
+          var drCompleted = st === 'Digital Review' && specimen.statusDone;
+          var fuCompleted = st === 'Follow-up' && specimen.statusDone;
+          if (drCompleted || fuCompleted) style = 'bg-green-100 text-green-800';
           html += '<span class="status-capsule ' + style + '">';
-          if (done) html += '<span class="material-symbols-outlined text-xs mr-1">check</span>';
+          if (drCompleted || fuCompleted) html += '<span class="material-symbols-outlined text-xs mr-1">check</span>';
           if (st === 'Locked') html += '<span class="material-symbols-outlined text-xs mr-1">lock</span>';
           html += st + '</span>';
         });
@@ -398,6 +481,10 @@
       function updateSidebar(id) {
         var spec = getSpecimenById(id);
         document.getElementById('sidebar-specimen-id').textContent = id || '-';
+        var prevHeader = document.getElementById('sidebar-prev-report-header');
+        if (prevHeader && typeof getPrevReportHeaderLabel === 'function') {
+          prevHeader.textContent = getPrevReportHeaderLabel(spec, '前次報告');
+        }
         if (!spec) {
           document.getElementById('sidebar-placeholder').classList.remove('hidden');
           document.getElementById('sidebar-content').classList.add('hidden');
@@ -499,13 +586,7 @@
       document.querySelectorAll('.mode-tab').forEach(function (tab) {
         tab.addEventListener('click', function () {
           var mode = this.dataset.mode;
-          currentMode = mode;
-          document.querySelectorAll('.mode-tab').forEach(function (t) {
-            t.classList.remove('bg-primary', 'text-white', 'border-primary');
-            t.classList.add('border-border-light', 'bg-surface-light', 'text-text-muted-light');
-          });
-          this.classList.remove('border-border-light', 'text-text-muted-light', 'bg-surface-light');
-          this.classList.add('bg-primary', 'text-white', 'border-primary');
+          setModeTabVisual(mode);
           var defaults = MODE_DEFAULT_STATUS[mode === 'digital' ? 'digital' : 'entity'];
           setStatusFilterCheckboxes(defaults);
           renderTable();
@@ -539,14 +620,81 @@
         if (typeof adjustAppFontLevel === 'function') fontLevel = adjustAppFontLevel(1);
       });
 
+      var LEAVE_KEY_ORDER = ['wbc', 'lymphocyte', 'monocyte', 'eosinophil', 'basophil', 'atypicalLymphocyte', 'blast', 'promyelocyte', 'myelocyte', 'metamyelocyte', 'hypersegmented', 'promonocyte', 'plasmaCell', 'abnormalLymphocyte'];
+
+      function buildLeaveSettingsForm() {
+        var body = document.getElementById('modal-leave-settings-body');
+        if (!body || typeof LEAVE_THRESHOLDS === 'undefined' || typeof DEFAULT_LEAVE_THRESHOLDS === 'undefined') return;
+        var labels = typeof LEAVE_THRESHOLD_LABELS !== 'undefined' ? LEAVE_THRESHOLD_LABELS : {};
+        var html = LEAVE_KEY_ORDER.map(function (k) {
+          var def = DEFAULT_LEAVE_THRESHOLDS[k];
+          var lab = labels[k] || k;
+          if (def === 'present') {
+            return '<div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-x-3 gap-y-1 py-2.5 border-b border-gray-100 items-start sm:items-center">' +
+              '<div><span class="font-medium text-text-light text-sm">' + lab + '</span><p class="text-[11px] text-text-muted-light mt-0.5">有數值（&gt;0）即視為達留單標準（Present）</p></div>' +
+              '<span class="text-xs font-medium text-text-muted-light shrink-0 sm:text-right">Present</span></div>';
+          }
+          var v = LEAVE_THRESHOLDS[k];
+          return '<div class="grid grid-cols-1 sm:grid-cols-[1fr_minmax(0,7rem)] gap-x-3 gap-y-1 py-2.5 border-b border-gray-100 items-center">' +
+            '<label class="font-medium text-text-light text-sm" for="leave-inp-' + k + '">' + lab + '</label>' +
+            '<input id="leave-inp-' + k + '" type="number" min="0" step="0.1" data-key="' + k + '" class="w-full px-2 py-1.5 text-sm border border-border-light rounded-md focus:ring-primary focus:border-primary" value="' + String(v) + '"/></div>';
+        });
+        body.innerHTML = html.join('');
+      }
+
+      function openLeaveSettingsModal() {
+        buildLeaveSettingsForm();
+        var m = document.getElementById('modal-leave-settings');
+        if (m) m.classList.remove('hidden');
+      }
+      function closeLeaveSettingsModal() {
+        var m = document.getElementById('modal-leave-settings');
+        if (m) m.classList.add('hidden');
+      }
+
+      var btnSettings = document.getElementById('btn-settings');
+      if (btnSettings) btnSettings.addEventListener('click', openLeaveSettingsModal);
+      var mClose = document.getElementById('modal-leave-settings-close');
+      var mBack = document.getElementById('modal-leave-settings-backdrop');
+      var mCancel = document.getElementById('modal-leave-settings-cancel');
+      if (mClose) mClose.addEventListener('click', closeLeaveSettingsModal);
+      if (mBack) mBack.addEventListener('click', closeLeaveSettingsModal);
+      if (mCancel) mCancel.addEventListener('click', closeLeaveSettingsModal);
+      var mReset = document.getElementById('modal-leave-settings-reset');
+      if (mReset) mReset.addEventListener('click', function () {
+        if (typeof resetLeaveThresholdsToDefaults === 'function') resetLeaveThresholdsToDefaults();
+        buildLeaveSettingsForm();
+      });
+      var mSave = document.getElementById('modal-leave-settings-save');
+      if (mSave) mSave.addEventListener('click', function () {
+        if (typeof LEAVE_THRESHOLDS === 'undefined' || typeof DEFAULT_LEAVE_THRESHOLDS === 'undefined') return;
+        LEAVE_KEY_ORDER.forEach(function (k) {
+          if (DEFAULT_LEAVE_THRESHOLDS[k] === 'present') {
+            LEAVE_THRESHOLDS[k] = 'present';
+            return;
+          }
+          var inp = document.querySelector('#modal-leave-settings input[data-key="' + k + '"]');
+          if (!inp) return;
+          var n = parseFloat(String(inp.value).replace(',', '.'), 10);
+          if (isNaN(n) || n < 0) n = DEFAULT_LEAVE_THRESHOLDS[k];
+          LEAVE_THRESHOLDS[k] = n;
+        });
+        if (typeof persistLeaveThresholdsToStorage === 'function') persistLeaveThresholdsToStorage();
+        closeLeaveSettingsModal();
+        var fs = document.getElementById('footer-status');
+        if (fs) fs.textContent = '留單標準已儲存';
+      });
+
       if (typeof APP_DATABASE !== 'undefined') {
         var depSel = document.getElementById('filter-department');
         if (APP_DATABASE.departments && depSel) APP_DATABASE.departments.forEach(function (d) { var o = document.createElement('option'); o.value = d; o.textContent = d; depSel.appendChild(o); });
         var macSel = document.getElementById('filter-machine');
         if (APP_DATABASE.machines && macSel) APP_DATABASE.machines.forEach(function (m) { var o = document.createElement('option'); o.value = m; o.textContent = m; macSel.appendChild(o); });
       }
-      setDefaultDateToday();
-      setStatusFilterCheckboxes(['PLT Check', 'AI Alert', 'Follow-up', 'Digital Review', 'Verified', 'Locked']);
+      try {
+        sessionStorage.removeItem('blood-morphology-specimen-ui-reset');
+      } catch (err) {}
+      applySpecimenListUiDemoDefaults();
       updateSortUI();
       renderTable();
       if (filteredList.length) selectRow(filteredList[0].id);
@@ -556,6 +704,17 @@
         var btnTutorial = document.getElementById('btn-tutorial');
         if (btnTutorial) btnTutorial.addEventListener('click', function () { Tutorial.startSpecimen(true); });
       }
+
+      // 其他分頁／視窗變更 flag 後，同步合併至記憶體並重繪列表
+      window.addEventListener('storage', function (e) {
+        if (e.key !== 'blood-morphology-specimen-status') return;
+        if (typeof applySpecimenStatusOverridesFromStorage === 'function') {
+          applySpecimenStatusOverridesFromStorage();
+        }
+        updateSortUI();
+        renderTable();
+        if (filteredList.length && currentSpecimenId) selectRow(currentSpecimenId);
+      });
     })();
   </script>
 </body>

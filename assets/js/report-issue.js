@@ -1,23 +1,6 @@
-// 報告核發介面 - 動態資料與風險判讀
+// 報告核發介面 - 動態資料與風險判讀（留單門檻見 common.js 之 LEAVE_THRESHOLDS）
 (function () {
   'use strict';
-
-  // 達任一條件即為留單，橫幅顯示紅色；未達則綠色
-  var LEAVE_THRESHOLDS = {
-    wbc: 30,
-    lymphocyte: 60,
-    monocyte: 20,
-    eosinophil: 20,
-    basophil: 5,
-    atypicalLymphocyte: 10,
-    blast: 'present',
-    promyelocyte: 'present',
-    myelocyte: 5,
-    metamyelocyte: 10,
-    promonocyte: 'present',
-    plasmaCell: 'present',
-    abnormalLymphocyte: 'present'
-  };
 
   var COMMON_ROWS = [
     ['Band', 'band'],
@@ -47,21 +30,6 @@
     ['Smudge cell', 'smudgeCell'],
     ['Artefact', 'artefact']
   ];
-
-  function parseNum(v) {
-    if (v === '-' || v === '' || v == null) return null;
-    var n = parseFloat(String(v).replace(',', '.'), 10);
-    return isNaN(n) ? null : n;
-  }
-
-  function isAbnormalValue(key, value) {
-    var th = LEAVE_THRESHOLDS[key];
-    if (th == null) return false;
-    var num = parseNum(value);
-    if (th === 'present') return num != null && num > 0;
-    if (typeof th === 'number') return num != null && num >= th;
-    return false;
-  }
 
   function getSpecimen() {
     var id = (typeof getSpecimenIdFromUrl === 'function') ? getSpecimenIdFromUrl() : '';
@@ -111,7 +79,7 @@
       // 人員編輯：若有人工編輯結果，優先顯示；否則退回原始 metrics
       var edited = editedMetrics[key] != null ? editedMetrics[key] : (metrics[key] || '-');
       var prevVal = prev[key] || '-';
-      var abnormal = isAbnormalValue(key, edited);
+      var abnormal = typeof isAbnormalMetricValue === 'function' && isAbnormalMetricValue(key, edited);
       var rowClass = abnormal ? 'bg-medical-red/5 hover:bg-medical-red/10' : 'hover:bg-zinc-50/50';
       var nameClass = abnormal ? 'text-medical-red font-bold' : 'text-zinc-800 dark:text-zinc-200 font-semibold';
       var valueClass = abnormal ? 'text-medical-red font-bold' : 'text-zinc-600';
@@ -141,10 +109,11 @@
 
   // 判斷人員編輯結果是否與 AI 不同（醫檢師有更動才以人員編輯判定橫幅，未更動則以 AI 判定）
   function editedDiffersFromAi(editedMetrics, metrics) {
+    if (typeof LEAVE_THRESHOLDS === 'undefined') return false;
     var keys = Object.keys(LEAVE_THRESHOLDS);
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i];
-      if (parseNum(editedMetrics[k]) !== parseNum(metrics[k])) return true;
+      if (parseMetricNum(editedMetrics[k]) !== parseMetricNum(metrics[k])) return true;
     }
     return false;
   }
@@ -156,10 +125,10 @@
     var hasEdited = Object.keys(editedMetrics).length > 0;
     var useEdited = hasEdited && editedDiffersFromAi(editedMetrics, metrics);
     var effective = useEdited ? editedMetrics : metrics;
-    var keys = Object.keys(LEAVE_THRESHOLDS);
+    var keys = typeof LEAVE_THRESHOLDS !== 'undefined' ? Object.keys(LEAVE_THRESHOLDS) : [];
     var hasLeave = false;
     keys.forEach(function (k) {
-      if (isAbnormalValue(k, effective[k])) hasLeave = true;
+      if (typeof isAbnormalMetricValue === 'function' && isAbnormalMetricValue(k, effective[k])) hasLeave = true;
     });
     var banner = document.getElementById('risk-banner');
     var icon = document.getElementById('risk-icon');
@@ -225,17 +194,21 @@
     });
   }
 
-  function init() {
-    if (typeof window.initAppFontLevel === 'function') window.initAppFontLevel();
-
-    var spec = getSpecimen();
+  function renderReportView(spec) {
     if (!spec) return;
     var title = document.getElementById('report-specimen-id');
     if (title) title.textContent = spec.id || '';
+    var prevWbcHeader = document.getElementById('wbc-prev-report-header');
+    if (prevWbcHeader && typeof getPrevReportHeaderLabel === 'function') {
+      prevWbcHeader.textContent = getPrevReportHeaderLabel(spec, '前次報告(%)');
+    }
+    var prevOtherHeader = document.getElementById('other-prev-report-header');
+    if (prevOtherHeader && typeof getPrevReportHeaderLabel === 'function') {
+      prevOtherHeader.textContent = getPrevReportHeaderLabel(spec, '前次報告');
+    }
     var statusWrap = document.getElementById('report-status-tags');
     if (statusWrap) {
       var statuses = spec.status || [];
-      var hasVerified = statuses.indexOf('Verified') >= 0;
       var displayStatuses = statuses.filter(function (s) { return s !== 'Verified'; });
       var html = displayStatuses.map(function (s) {
         var style = 'bg-gray-100 text-gray-800';
@@ -243,18 +216,22 @@
         var prefixIcon = '';
         if (s === 'AI Alert' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['AI Alert'] || style;
         else if (s === 'PLT Check' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['PLT Check'] || style;
-        else if (s === 'Follow-up' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['Follow-up'] || style;
-        else if (s === 'Digital Review' && hasVerified) {
+        else if (s === 'Follow-up' && spec.statusDone) {
+          style = 'bg-green-100 text-green-800';
+          prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
+        } else if (s === 'Follow-up' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['Follow-up'] || style;
+        else if (s === 'Digital Review' && spec.statusDone) {
           style = 'bg-green-100 text-green-800';
           prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
         } else if (s === 'Digital Review' && typeof STATUS_STYLES !== 'undefined') {
           style = STATUS_STYLES['Digital Review'] || style;
+        } else if (s === 'Manual Alert' && typeof STATUS_STYLES !== 'undefined') {
+          style = STATUS_STYLES['Manual Alert'] || style;
         }
         return '<span class="inline-flex items-center px-3 py-0.5 rounded-full text-[11px] font-semibold ' + style + '">' + prefixIcon + label + '</span>';
       }).join('');
       statusWrap.innerHTML = html;
     }
-    // 若此畫面是被嵌在 iframe（影像檢視頁的彈出視窗），就隱藏內部自己的關閉按鈕，避免雙重叉叉
     if (window.self !== window.top) {
       var internalClose = document.getElementById('btn-close');
       if (internalClose) internalClose.style.display = 'none';
@@ -263,6 +240,34 @@
     buildWbcTable(spec);
     buildOtherTable(spec);
     fillCbcPanel(spec);
+  }
+
+  function refreshReportFromParent() {
+    if (typeof applySpecimenStatusOverridesFromStorage === 'function') {
+      applySpecimenStatusOverridesFromStorage();
+    }
+    var spec = getSpecimen();
+    if (!spec) return;
+    renderReportView(spec);
+  }
+
+  function init() {
+    if (typeof window.initAppFontLevel === 'function') window.initAppFontLevel();
+
+    var spec = getSpecimen();
+    if (!spec) return;
+    renderReportView(spec);
+
+    if (window.__reportIssueUiBound) return;
+    window.__reportIssueUiBound = true;
+
+    window.addEventListener('message', function (e) {
+      var data = e.data || {};
+      if (data.type !== 'specimenDataUpdated') return;
+      var myId = (typeof getSpecimenIdFromUrl === 'function') ? getSpecimenIdFromUrl() : '';
+      if (!data.specimenId || !myId || data.specimenId !== myId) return;
+      refreshReportFromParent();
+    });
 
     var cancelBtn = document.getElementById('btn-cancel');
     if (cancelBtn) {
@@ -279,8 +284,10 @@
     if (confirmBtn) {
       confirmBtn.addEventListener('click', function () {
         if (!confirm('確認要簽核並核發此報告嗎？')) return;
+        var s = getSpecimen();
+        var sid = s ? s.id : '';
         if (window.self !== window.top && window.parent) {
-          window.parent.postMessage({ type: 'reportVerified', specimenId: spec.id }, '*');
+          window.parent.postMessage({ type: 'reportVerified', specimenId: sid }, '*');
         } else if (typeof goToSpecimenList === 'function') {
           goToSpecimenList();
         }

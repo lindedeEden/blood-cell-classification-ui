@@ -25,9 +25,8 @@
     ├── css/
     │   └── common.css              # 共用樣式
     ├── js/
-    │   ├── common.js               # 共用工具與導頁（取得檢體 ID、頁面跳轉等）
+    │   ├── common.js               # 共用工具、導頁、留單門檻（LEAVE_THRESHOLDS）、字型與狀態持久化等
     │   ├── login.js                # 登入頁行為
-    │   ├── specimen-list.js        # 檢體管理頁邏輯
     │   ├── image-review.js         # 影像檢視與細胞編輯行為（細胞顯示 / 多選 / 拖曳 / 單手模式等）
     │   └── report-issue.js         # 報告核發頁邏輯（風險橫幅 / 數據表格 / 簽核事件）
     └── images/
@@ -146,13 +145,14 @@
   - `getSpecimenIdFromUrl()`：從 URL query 取出 `specimen` 或 `id`。
   - `goToImageReview()` / `goToReportIssue()` / `goToSpecimenList()`：統一處理頁面間導頁。
   - `getSpecimenById()`：從 `MOCK_SPECIMENS`（由資料庫拷貝）中找到對應檢體。
+  - `LEAVE_THRESHOLDS` / `parseMetricNum()` / `isAbnormalMetricValue()`：留單門檻與異常判定，與影像側欄分析表、報告核發橫幅共用。
 
 ---
 
 ## 開發與維護建議
 
 - **檔案分工清楚**
-  - 各頁面的邏輯已拆出到對應的 JS 檔案：`login.js`、`specimen-list.js`、`image-review.js`、`report-issue.js`，維護時只需要打開對應檔案即可。
+  - `檢體管理.html` 的列表／篩選邏輯目前寫在該頁內嵌腳本；其餘頁為 `login.js`、`image-review.js`、`report-issue.js` 與共用 `common.js`。
 
 - **未來要接後端 API 時**：
   - 優先修改的地方：

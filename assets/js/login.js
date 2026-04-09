@@ -33,6 +33,13 @@
     // 簡易本機驗證：demo 用帳號密碼
     // TODO: 未來可改為呼叫後端 API 檢查帳密
     if ((account === 'admin' && password === 'admin') || (account === 'user' && password === 'user')) {
+      try {
+        sessionStorage.setItem('blood-morphology-user-account', account);
+        /** 展示用：下次開啟檢體管理時套用固定預設排序／篩選 */
+        sessionStorage.setItem('blood-morphology-specimen-ui-reset', '1');
+        /** 展示用：清除閱片／Add Flag 等寫入的檢體狀態覆寫，重新登入後還原 database.js 原始資料 */
+        localStorage.removeItem('blood-morphology-specimen-status');
+      } catch (err) {}
       window.location.href = '檢體管理.html';
       return;
     }

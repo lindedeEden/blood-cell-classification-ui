@@ -3,6 +3,21 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>影像檢視與細胞編輯 - 血球型態分類軟體</title>
+<script>
+        (function () {
+            try {
+                var key = 'blood-morphology-font-level';
+                var classes = ['font-size-small', 'font-size-normal', 'font-size-large', 'font-size-xlarge'];
+                var raw = window.localStorage.getItem(key);
+                var level = parseInt(raw, 10);
+                if (isNaN(level)) level = 1;
+                level = Math.max(0, Math.min(3, level));
+                var root = document.documentElement;
+                classes.forEach(function (c) { root.classList.remove(c); });
+                root.classList.add(classes[level]);
+            } catch (e) {}
+        })();
+    </script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -84,9 +99,9 @@
 <link rel="stylesheet" href="assets/css/common.css"/>
 <link rel="stylesheet" href="assets/css/tutorial.css"/>
 </head>
-<body class="bg-background-light font-display text-gray-800 min-h-0">
+<body class="bg-background-light font-display text-gray-800 text-sm min-h-0">
 <div class="flex h-screen w-full min-h-0 overflow-hidden">
-<aside class="w-[360px] flex-shrink-0 bg-card border-r border-gray-300/80 flex flex-col p-4 space-y-4 min-h-0 overflow-y-auto overscroll-contain">
+<aside class="w-1/3 min-w-[300px] max-w-[420px] flex-shrink-0 bg-card border-r border-gray-300/80 flex flex-col p-4 space-y-4 min-h-0 overflow-y-auto overscroll-contain">
 <div class="space-y-4">
 <div id="tutorial-image-tl">
 <div class="flex flex-col gap-2 px-1">
@@ -107,24 +122,25 @@
 <div class="p-2 border-b border-gray-200">
 <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">Toggle Status</span>
 </div>
+<!-- Add Flag 小圓點與 common.js STATUS_STYLES 膠囊同色調（*-500 對應各狀態主色） -->
 <div class="p-1 space-y-0.5">
-<label class="flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer group">
-<input class="w-3.5 h-3.5 rounded text-primary border-gray-300 focus:ring-primary focus:ring-offset-0" type="checkbox"/>
+<label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer group select-none" data-flag="AI Alert" role="button">
 <div class="w-2 h-2 rounded-full bg-orange-500"></div>
 <span class="text-xs font-medium text-gray-700">AI Alert</span>
 </label>
-<label class="flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer">
-<input class="w-3.5 h-3.5 rounded text-primary border-gray-300 focus:ring-primary focus:ring-offset-0" type="checkbox"/>
+<label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer select-none" data-flag="PLT Check" role="button">
 <div class="w-2 h-2 rounded-full bg-blue-500"></div>
 <span class="text-xs font-medium text-gray-700">PLT Check</span>
 </label>
-<label class="flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer">
-<input class="w-3.5 h-3.5 rounded text-primary border-gray-300 focus:ring-primary focus:ring-offset-0" type="checkbox"/>
-<div class="w-2 h-2 rounded-full bg-green-500"></div>
+<label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer select-none" data-flag="Follow-up" role="button">
+<div class="w-2 h-2 rounded-full bg-red-500"></div>
 <span class="text-xs font-medium text-gray-700">Follow-up</span>
 </label>
-<label class="flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer">
-<input class="w-3.5 h-3.5 rounded text-primary border-gray-300 focus:ring-primary focus:ring-offset-0" type="checkbox"/>
+<label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer select-none" data-flag="Manual Alert" role="button">
+<div class="w-2 h-2 rounded-full bg-amber-500"></div>
+<span class="text-xs font-medium text-gray-700">Manual Alert</span>
+</label>
+<label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer select-none" data-flag="Digital Review" role="button">
 <div class="w-2 h-2 rounded-full bg-purple-500"></div>
 <span class="text-xs font-medium text-gray-700">Digital Review</span>
 </label>
@@ -294,10 +310,10 @@
 </details>
 </div>
 </div>
-<script src="assets/data/database.js?v=20260302c"></script>
-<script src="assets/js/common.js?v=20260302c"></script>
+<script src="assets/data/database.js?v=20260411b"></script>
+<script src="assets/js/common.js?v=20260411b"></script>
 <script src="assets/js/tutorial.js"></script>
-<script src="assets/js/image-review.js?v=20260302c"></script>
+<script src="assets/js/image-review.js?v=20260411b"></script>
 <script>
     function toggleGrid(headerEl) {
       var card = headerEl && headerEl.closest ? headerEl.closest('.group') : (headerEl && headerEl.parentElement);

@@ -5,23 +5,40 @@
 (function () {
   'use strict';
 
-  var LEAVE_THRESHOLDS = {
-    wbc: 30,
-    lymphocyte: 60,
-    monocyte: 20,
-    eosinophil: 20,
-    basophil: 5,
-    atypicalLymphocyte: 10,
-    blast: 'present',
-    promyelocyte: 'present',
-    myelocyte: 5,
-    metamyelocyte: 10,
-    promonocyte: 'present',
-    plasmaCell: 'present',
-    abnormalLymphocyte: 'present'
-  };
-
   var ABNORMAL_ORDER = ['Blast', 'Promyelocyte', 'Myelocyte', 'Metamyelocyte', 'Hypersegmented', 'Promonocyte', 'Plasma Cell', 'Abnormal Lymphocyte'];
+  // 右側細胞區塊預設排序需與「分析與歷史報告」一致（成熟細胞先、異常細胞後）
+  var DEFAULT_CATEGORY_ORDER = [
+    'Band',
+    'Segmented Neutrophil',
+    'Eosinophil',
+    'Monocyte',
+    'Basophil',
+    'Lymphocyte',
+    'Abnormal Lymphocyte',
+    'Blast',
+    'Promyelocyte',
+    'Myelocyte',
+    'Metamyelocyte',
+    'Hypersegmented',
+    'Promonocyte',
+    'Plasma Cell',
+    'Megakaryocyte',
+    'NRBC',
+    'Giant PLT',
+    'Smudge Cell',
+    'Unidentified',
+    'Artefact'
+  ];
+  var CATEGORY_TO_METRIC_KEY = {
+    'Blast': 'blast',
+    'Promyelocyte': 'promyelocyte',
+    'Myelocyte': 'myelocyte',
+    'Metamyelocyte': 'metamyelocyte',
+    'Hypersegmented': 'hypersegmented',
+    'Promonocyte': 'promonocyte',
+    'Plasma Cell': 'plasmaCell',
+    'Abnormal Lymphocyte': 'abnormalLymphocyte'
+  };
   var COMMON_TYPES = ['Segmented Neutrophil', 'Band', 'Lymphocyte', 'Monocyte', 'Eosinophil', 'Basophil', 'Giant PLT', 'NRBC', 'Smudge Cell'];
   var ABNORMAL_TYPES = ['Blast', 'Promyelocyte', 'Myelocyte', 'Metamyelocyte', 'Hypersegmented', 'Promonocyte', 'Plasma Cell', 'Abnormal Lymphocyte', 'Megakaryocyte'];
   var OTHER_TYPES = ['Unidentified', 'Artefact'];
@@ -47,7 +64,7 @@
     return APP_DATABASE.specimens.filter(function (s) {
       if (s.locked) return false;
       var st = s.status || [];
-      return st.indexOf('Digital Review') >= 0 && st.indexOf('Verified') < 0;
+      return st.indexOf('Digital Review') >= 0 && !s.statusDone;
     });
   }
 
@@ -140,19 +157,35 @@
     return list;
   }
 
-  function parseNum(v) {
-    if (v === '-' || v === '' || v == null) return null;
-    var n = parseFloat(String(v).replace(',', '.'), 10);
-    return isNaN(n) ? null : n;
+  function isLeaveConditionReachedByCurrentCells(category, count, pct) {
+    var metricKey = CATEGORY_TO_METRIC_KEY[category];
+    if (!metricKey) return false;
+    var threshold = typeof LEAVE_THRESHOLDS !== 'undefined' ? LEAVE_THRESHOLDS[metricKey] : undefined;
+    if (threshold == null) return false;
+    if (threshold === 'present') return count > 0;
+    if (typeof threshold === 'number') return pct >= threshold;
+    return false;
   }
 
-  function isAbnormalValue(key, value, prevValue) {
-    var th = LEAVE_THRESHOLDS[key];
-    if (th == null) return false;
-    var num = parseNum(value);
-    if (th === 'present') return num != null && num > 0;
-    if (typeof th === 'number') return num != null && num >= th;
-    return false;
+  function getSortedCategoryOrder(byCat, totalCount) {
+    var defaultOrder = DEFAULT_CATEGORY_ORDER.slice();
+    Object.keys(byCat).forEach(function (t) {
+      if (defaultOrder.indexOf(t) < 0) defaultOrder.push(t);
+    });
+
+    var leaveHitCategories = defaultOrder.filter(function (cat) {
+      if (!byCat[cat]) return false;
+      var count = byCat[cat].length;
+      var pct = totalCount > 0 ? (count / totalCount * 100) : 0;
+      return isLeaveConditionReachedByCurrentCells(cat, count, pct);
+    });
+
+    // 一種留單：該異常置頂；兩種(含以上)留單：所有命中異常置頂。
+    // 置頂後其餘項目保留 defaultOrder 的相對順序，避免排序衝突。
+    if (leaveHitCategories.length === 0) return defaultOrder;
+    var prioritized = leaveHitCategories;
+    var rest = defaultOrder.filter(function (cat) { return prioritized.indexOf(cat) < 0; });
+    return prioritized.concat(rest);
   }
 
   /** 與檢體管理介面相同：分析與歷史的列順序與標籤 */
@@ -181,24 +214,25 @@
   }
 
   function shouldHighlightAnalysisRow(label, aiValueStr) {
-    var v = parseNum(aiValueStr);
-    if (v == null) v = 0;
-    switch (label) {
-      case 'WBC (10e9/L)': return v >= 30;
-      case 'Lymphocyte (%)': return v >= 60;
-      case 'Monocyte (%)': return v >= 20;
-      case 'Eosinophil (%)': return v >= 20;
-      case 'Basophil (%)': return v >= 5;
-      case 'Atypical lymphocyte (%)': return v >= 10;
-      case 'Blast (%)': return aiValueStr && aiValueStr !== '-' && parseNum(aiValueStr) > 0;
-      case 'Promyelocyte (%)': return aiValueStr && aiValueStr !== '-' && parseNum(aiValueStr) > 0;
-      case 'Myelocyte (%)': return v >= 5;
-      case 'Metamyelocyte (%)': return v >= 10;
-      case 'Promonocyte (%)': return aiValueStr && aiValueStr !== '-' && parseNum(aiValueStr) > 0;
-      case 'Plasma cell (%)': return aiValueStr && aiValueStr !== '-' && parseNum(aiValueStr) > 0;
-      case 'Abnormal lymphocyte (%)': return aiValueStr && aiValueStr !== '-' && parseNum(aiValueStr) > 0;
-      default: return false;
-    }
+    var LABEL_TO_KEY = {
+      'WBC (10e9/L)': 'wbc',
+      'Lymphocyte (%)': 'lymphocyte',
+      'Monocyte (%)': 'monocyte',
+      'Eosinophil (%)': 'eosinophil',
+      'Basophil (%)': 'basophil',
+      'Atypical lymphocyte (%)': 'atypicalLymphocyte',
+      'Blast (%)': 'blast',
+      'Promyelocyte (%)': 'promyelocyte',
+      'Myelocyte (%)': 'myelocyte',
+      'Metamyelocyte (%)': 'metamyelocyte',
+      'Hypersegmented (%)': 'hypersegmented',
+      'Promonocyte (%)': 'promonocyte',
+      'Plasma cell (%)': 'plasmaCell',
+      'Abnormal lymphocyte (%)': 'abnormalLymphocyte'
+    };
+    var key = LABEL_TO_KEY[label];
+    if (!key || typeof isAbnormalMetricValue !== 'function') return false;
+    return isAbnormalMetricValue(key, aiValueStr);
   }
 
   function getMetricKeys() {
@@ -220,7 +254,6 @@
     var tagsContainer = document.getElementById('sidebar-status-tags');
     if (tagsContainer) {
       var statuses = specimen.status || [];
-      var hasVerified = statuses.indexOf('Verified') >= 0;
       var displayStatuses = statuses.filter(function (s) { return s !== 'Verified'; });
       tagsContainer.innerHTML = displayStatuses.map(function (s) {
         var style;
@@ -228,11 +261,15 @@
         var prefixIcon = '';
         if (s === 'AI Alert') style = 'bg-orange-100 text-orange-800';
         else if (s === 'PLT Check') style = 'bg-blue-100 text-blue-800';
-        else if (s === 'Follow-up') style = 'bg-red-100 text-red-800';
-        else if (s === 'Digital Review' && hasVerified) {
+        else if (s === 'Follow-up' && specimen.statusDone) {
+          style = 'bg-green-100 text-green-800';
+          prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
+        } else if (s === 'Follow-up') style = 'bg-red-100 text-red-800';
+        else if (s === 'Digital Review' && specimen.statusDone) {
           style = 'bg-green-100 text-green-800';
           prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
         } else if (s === 'Digital Review') style = 'bg-purple-100 text-purple-800';
+        else if (s === 'Manual Alert' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['Manual Alert'] || 'bg-amber-100 text-amber-950';
         else style = 'bg-gray-100 text-gray-800';
         return '<div class="group relative inline-flex items-center gap-1 px-3 py-1 rounded-full ' + style + ' text-[10px] font-bold uppercase tracking-wider" data-status="' + s + '">' + prefixIcon + label + ' <span class="material-symbols-outlined text-[14px] hidden group-hover:inline cursor-pointer">close</span></div>';
       }).join('');
@@ -240,7 +277,7 @@
       if (addFlag && !document.querySelector('#sidebar-status-tags + .relative')) {
         var wrap = document.createElement('div');
         wrap.className = 'relative dropdown-container';
-        wrap.innerHTML = '<button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-gray-600 text-[10px] font-medium hover:bg-gray-50" id="add-flag-btn"><span class="material-symbols-outlined text-sm">add</span> Add Flag</button><div class="dropdown-menu absolute left-0 top-full mt-2 w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-50 hidden"><div class="p-2 border-b border-gray-200"><span class="text-[10px] font-bold text-gray-500 uppercase">新增標記</span></div><div class="p-1"><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="AI Alert">AI Alert</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="PLT Check">PLT Check</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Follow-up">Follow-up</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Digital Review">Digital Review</button></div></div></div>';
+        wrap.innerHTML = '<button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-gray-600 text-[10px] font-medium hover:bg-gray-50" id="add-flag-btn"><span class="material-symbols-outlined text-sm">add</span> Add Flag</button><div class="dropdown-menu absolute left-0 top-full mt-2 w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-50 hidden"><div class="p-2 border-b border-gray-200"><span class="text-[10px] font-bold text-gray-500 uppercase">新增標記</span></div><div class="p-1"><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="AI Alert">AI Alert</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="PLT Check">PLT Check</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Follow-up">Follow-up</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Manual Alert">Manual Alert</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Digital Review">Digital Review</button></div></div></div>';
         tagsContainer.parentNode.insertBefore(wrap, tagsContainer.nextSibling);
       }
       tagsContainer.querySelectorAll('[data-status]').forEach(function (el) {
@@ -250,20 +287,21 @@
 
       var dropdown = document.querySelector('#sidebar-add-flag .dropdown-menu');
       if (dropdown) {
-        var inputs = dropdown.querySelectorAll('input[type="checkbox"]');
-        inputs.forEach(function (input) {
-          var labelEl = input.closest('label');
-          if (!labelEl) return;
-          var textEl = labelEl.querySelector('span.text-xs');
-          var flag = textEl ? textEl.textContent.trim() : '';
+        var flagRows = dropdown.querySelectorAll('[data-flag]');
+        flagRows.forEach(function (labelEl) {
+          var flag = labelEl.getAttribute('data-flag') || '';
           if (!flag) return;
-          input.checked = false;
-          input.onchange = function () {
-            if (input.checked) {
-              addStatus(flag);
-              input.checked = false;
+          var triggerAddFlag = function (e) {
+            if (e) e.preventDefault();
+            addStatus(flag);
+          };
+          labelEl.onclick = triggerAddFlag;
+          labelEl.onkeydown = function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              triggerAddFlag(e);
             }
           };
+          if (!labelEl.hasAttribute('tabindex')) labelEl.setAttribute('tabindex', '0');
         });
       }
     }
@@ -312,8 +350,9 @@
     var tableContainer = document.getElementById('sidebar-analysis-table');
     if (tableContainer) {
       var rows = getAnalysisTableRows(specimen);
+      var prevHeader = typeof getPrevReportHeaderLabel === 'function' ? getPrevReportHeaderLabel(specimen, '前次報告') : '前次報告';
       var header = '<div class="grid grid-cols-4 gap-2 font-semibold text-gray-600 py-1.5 border-b border-gray-300/80 sticky top-0 bg-card z-[1] text-[10px] uppercase tracking-wider">' +
-        '<div class="col-span-1">Cell Type</div><div class="col-span-1 text-right">Flow Cyt.</div><div class="col-span-1 text-right">AI</div><div class="col-span-1 text-right">Prev.</div></div>';
+        '<div class="col-span-1"></div><div class="col-span-1 text-right">流式計數</div><div class="col-span-1 text-right">AI</div><div class="col-span-1 text-right">' + prevHeader + '</div></div>';
       var body = rows.map(function (r) {
         var label = r[0];
         var aiVal = r[2];
@@ -333,21 +372,46 @@
     }
   }
 
+  function notifyReportIframeToRefresh() {
+    var modal = document.getElementById('report-issue-modal');
+    var iframe = document.getElementById('report-issue-iframe');
+    if (!modal || modal.classList.contains('hidden') || !iframe || !iframe.contentWindow) return;
+    try {
+      iframe.contentWindow.postMessage({ type: 'specimenDataUpdated', specimenId: currentSpecimenId }, '*');
+    } catch (e) {}
+  }
+
   function removeStatus(status) {
     if (!currentSpecimen || !currentSpecimen.status) return;
     currentSpecimen.status = currentSpecimen.status.filter(function (s) { return s !== status; });
+    if (typeof window.persistSpecimenStatusOverride === 'function') {
+      window.persistSpecimenStatusOverride(currentSpecimen.id, currentSpecimen.status);
+    }
     digitalReviewList = getDigitalReviewList();
     renderSidebar();
+    notifyReportIframeToRefresh();
   }
 
   function addStatus(status) {
     if (!currentSpecimen) return;
     if (!Array.isArray(currentSpecimen.status)) currentSpecimen.status = [];
-    if (currentSpecimen.status.indexOf(status) === -1) {
-      currentSpecimen.status.push(status);
-      digitalReviewList = getDigitalReviewList();
-      renderSidebar();
+    var st = currentSpecimen.status.slice();
+    /** Manual Alert 與 Digital Review 互斥；其餘狀態保留 */
+    if (status === 'Manual Alert') {
+      st = st.filter(function (s) { return s !== 'Digital Review'; });
+      currentSpecimen.statusDone = false;
+    } else if (status === 'Digital Review') {
+      st = st.filter(function (s) { return s !== 'Manual Alert'; });
     }
+    if (st.indexOf(status) === -1) st.push(status);
+    currentSpecimen.status = st;
+    var persistOpts = status === 'Manual Alert' ? { statusDone: false } : undefined;
+    if (typeof window.persistSpecimenStatusOverride === 'function') {
+      window.persistSpecimenStatusOverride(currentSpecimen.id, currentSpecimen.status, persistOpts);
+    }
+    digitalReviewList = getDigitalReviewList();
+    renderSidebar();
+    notifyReportIframeToRefresh();
   }
 
   function navigatePrevNext(delta) {
@@ -394,10 +458,7 @@
       byCat[c.category].push(c);
     });
 
-    var catOrder = ABNORMAL_ORDER.slice();
-    COMMON_TYPES.forEach(function (t) { if (byCat[t] && catOrder.indexOf(t) < 0) catOrder.push(t); });
-    OTHER_TYPES.forEach(function (t) { if (byCat[t] && catOrder.indexOf(t) < 0) catOrder.push(t); });
-    Object.keys(byCat).forEach(function (t) { if (catOrder.indexOf(t) < 0) catOrder.push(t); });
+    var catOrder = getSortedCategoryOrder(byCat, total);
 
     var thresholdPct = { Blast: 0, Promyelocyte: 0, Myelocyte: 5, Metamyelocyte: 10 };
     var html = '';
@@ -700,6 +761,7 @@
 
   function init() {
     if (typeof window.initAppFontLevel === 'function') window.initAppFontLevel();
+    if (typeof window.initCellImageZoomLevel === 'function') zoomLevel = window.initCellImageZoomLevel();
 
     try {
       currentSpecimenId = (typeof window.getSpecimenIdFromUrl === 'function') ? window.getSpecimenIdFromUrl() : '';
@@ -746,10 +808,15 @@
     var zoomIn = document.getElementById('zoom-in');
     var zoomOut = document.getElementById('zoom-out');
     function updateZoom(delta) {
-      zoomLevel = Math.min(200, Math.max(50, zoomLevel + delta));
+      if (typeof window.adjustCellImageZoomLevel === 'function') {
+        zoomLevel = window.adjustCellImageZoomLevel(delta);
+      } else {
+        zoomLevel = Math.min(200, Math.max(50, zoomLevel + delta));
+      }
       if (zoomEl) zoomEl.textContent = zoomLevel + '%';
       applyZoom();
     }
+    if (zoomEl) zoomEl.textContent = zoomLevel + '%';
     if (zoomIn) zoomIn.addEventListener('click', function () { updateZoom(10); });
     if (zoomOut) zoomOut.addEventListener('click', function () { updateZoom(-10); });
 
@@ -796,12 +863,21 @@
       var spec = APP_DATABASE.specimens.find(function (s) { return s.id === id; });
       if (!spec) return;
       if (!Array.isArray(spec.status)) spec.status = [];
-      // 標記此檢體已完成數位閱片簽核（供檢體管理頁 renderStatus 使用）
+      // 標記此檢體已完成數位閱片簽核：不另加 Verified，改以 statusDone + Digital Review 綠勾呈現
       spec.statusDone = true;
-      if (spec.status.indexOf('Verified') === -1) spec.status.push('Verified');
+      if (Array.isArray(spec.status)) {
+        spec.status = spec.status.filter(function (x) { return x !== 'Verified'; });
+      }
+      var editorAccount = typeof getCurrentUserAccount === 'function' ? getCurrentUserAccount() : '';
+      if (editorAccount) spec.editor = editorAccount;
+      if (typeof window.persistSpecimenStatusOverride === 'function') {
+        window.persistSpecimenStatusOverride(id, spec.status, { statusDone: true, editor: editorAccount });
+      }
+      notifyReportIframeToRefresh();
       if (currentSpecimen && currentSpecimen.id === id) {
         currentSpecimen.status = spec.status.slice();
         currentSpecimen.statusDone = true;
+        if (editorAccount) currentSpecimen.editor = editorAccount;
         digitalReviewList = getDigitalReviewList();
         renderSidebar();
       }
