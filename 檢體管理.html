@@ -232,6 +232,8 @@
       var sortKey = 'time';
       var sortAsc = false;
       var fontLevel = typeof initAppFontLevel === 'function' ? initAppFontLevel() : 1;
+      var SPECIMEN_LIST_MODE_STORAGE_KEY = 'blood-morphology-specimen-list-mode';
+      var SPECIMEN_LIST_UI_STATE_STORAGE_KEY = 'blood-morphology-specimen-list-ui-state';
 
       /** 初始載入預設：不選數位／實體模式；狀態全勾選以顯示完整清單（登入後進入本頁亦同） */
       var SPECIMEN_LIST_DEMO = {
@@ -263,19 +265,109 @@
         });
       }
 
-      function applySpecimenListUiDemoDefaults() {
-        sortKey = SPECIMEN_LIST_DEMO.sortKey;
-        sortAsc = SPECIMEN_LIST_DEMO.sortAsc;
-        setModeTabVisual(null);
-        setStatusFilterCheckboxes(SPECIMEN_LIST_DEMO.statusFiltersAll);
-        var search = document.getElementById('specimen-search');
-        if (search) search.value = '';
-        var em = document.getElementById('exact-match');
-        if (em) em.checked = false;
+      function persistModeSelection(mode) {
+        try {
+          if (!mode) {
+            localStorage.removeItem(SPECIMEN_LIST_MODE_STORAGE_KEY);
+            return;
+          }
+          localStorage.setItem(SPECIMEN_LIST_MODE_STORAGE_KEY, mode);
+        } catch (e) {}
+      }
+
+      function getStoredModeSelection() {
+        try {
+          var stored = localStorage.getItem(SPECIMEN_LIST_MODE_STORAGE_KEY);
+          if (stored === 'digital' || stored === 'entity') return stored;
+        } catch (e) {}
+        return null;
+      }
+
+      function getDefaultUiState() {
+        return {
+          mode: null,
+          sortKey: SPECIMEN_LIST_DEMO.sortKey,
+          sortAsc: SPECIMEN_LIST_DEMO.sortAsc,
+          statuses: SPECIMEN_LIST_DEMO.statusFiltersAll.slice(),
+          dateStart: SPECIMEN_LIST_DEMO.demoDate,
+          dateEnd: SPECIMEN_LIST_DEMO.demoDate,
+          department: '',
+          machine: '',
+          search: '',
+          exactMatch: false
+        };
+      }
+
+      function collectSpecimenListUiState() {
+        return {
+          mode: currentMode,
+          sortKey: sortKey,
+          sortAsc: !!sortAsc,
+          statuses: getSelectedStatuses(),
+          dateStart: document.getElementById('analysis-date-start').value || '',
+          dateEnd: document.getElementById('analysis-date-end').value || '',
+          department: document.getElementById('filter-department').value || '',
+          machine: document.getElementById('filter-machine').value || '',
+          search: (document.getElementById('specimen-search').value || '').trim(),
+          exactMatch: !!document.getElementById('exact-match').checked
+        };
+      }
+
+      function persistSpecimenListUiState() {
+        try {
+          localStorage.setItem(SPECIMEN_LIST_UI_STATE_STORAGE_KEY, JSON.stringify(collectSpecimenListUiState()));
+        } catch (e) {}
+      }
+
+      function getStoredSpecimenListUiState() {
+        try {
+          var raw = localStorage.getItem(SPECIMEN_LIST_UI_STATE_STORAGE_KEY);
+          if (!raw) return null;
+          var parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== 'object') return null;
+          return parsed;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function applySpecimenListUiState(state) {
+        var data = state || getDefaultUiState();
+        var mode = (data.mode === 'digital' || data.mode === 'entity') ? data.mode : null;
+        currentMode = mode;
+        setModeTabVisual(mode);
+        persistModeSelection(mode);
+        sortKey = data.sortKey || SPECIMEN_LIST_DEMO.sortKey;
+        sortAsc = typeof data.sortAsc === 'boolean' ? data.sortAsc : SPECIMEN_LIST_DEMO.sortAsc;
+        var statuses = Array.isArray(data.statuses) ? data.statuses : SPECIMEN_LIST_DEMO.statusFiltersAll;
+        setStatusFilterCheckboxes(statuses);
+        var start = document.getElementById('analysis-date-start');
+        var end = document.getElementById('analysis-date-end');
         var dep = document.getElementById('filter-department');
-        if (dep) dep.value = '';
         var mac = document.getElementById('filter-machine');
-        if (mac) mac.value = '';
+        var search = document.getElementById('specimen-search');
+        var em = document.getElementById('exact-match');
+        if (start) start.value = data.dateStart || SPECIMEN_LIST_DEMO.demoDate;
+        if (end) end.value = data.dateEnd || SPECIMEN_LIST_DEMO.demoDate;
+        if (dep) dep.value = data.department || '';
+        if (mac) mac.value = data.machine || '';
+        if (search) search.value = data.search || '';
+        if (em) em.checked = !!data.exactMatch;
+      }
+
+      function applySpecimenListUiDemoDefaults() {
+        var savedState = getStoredSpecimenListUiState();
+        if (savedState) {
+          applySpecimenListUiState(savedState);
+          return;
+        }
+        var defaultState = getDefaultUiState();
+        var restoredMode = getStoredModeSelection();
+        if (restoredMode) {
+          defaultState.mode = restoredMode;
+          defaultState.statuses = (MODE_DEFAULT_STATUS[restoredMode] || []).slice();
+        }
+        applySpecimenListUiState(defaultState);
         setDefaultDateToday();
       }
 
@@ -305,6 +397,17 @@
 
       function applyFilters() {
         var f = getFilters();
+        function statusMatchesSelection(specimen, statusKey) {
+          if (statusKey === 'Digital Review' && typeof isDigitalReviewDone === 'function') {
+            return !isDigitalReviewDone(specimen);
+          }
+          if (typeof isEntityStatusCompleted === 'function' &&
+              (statusKey === 'PLT Check' || statusKey === 'Follow-up' || statusKey === 'AI Alert' || statusKey === 'Manual Alert')) {
+            return !isEntityStatusCompleted(specimen, statusKey);
+          }
+          var st = specimen.status || [];
+          return st.indexOf(statusKey) !== -1;
+        }
         filteredList = MOCK_SPECIMENS.filter(function (s) {
           if (f.dateStart && s.analysisTime) {
             var docDate = s.analysisTime.slice(0, 10).replace(/\//g, '-');
@@ -327,10 +430,12 @@
             }
           }
           var selected = f.statuses || [];
-          var isVerifiedSpecimen = !!(s.statusDone || (s.status && s.status.indexOf('Verified') !== -1));
+          var isVerifiedSpecimen = typeof isSpecimenWorkflowCompleted === 'function'
+            ? isSpecimenWorkflowCompleted(s)
+            : !!(s.statusDone || (s.status && s.status.indexOf('Verified') !== -1));
           if (isVerifiedSpecimen && selected.indexOf('Verified') === -1) return false;
           if (selected.length === 0) return true;
-          var hasStatus = (s.status || []).some(function (st) { return selected.indexOf(st) !== -1; });
+          var hasStatus = selected.some(function (st) { return statusMatchesSelection(s, st); });
           var showVerified = isVerifiedSpecimen && selected.indexOf('Verified') !== -1;
           if (!hasStatus && !showVerified) return false;
           return true;
@@ -339,11 +444,11 @@
         function specimenStatusShowsCheckmark(s) {
           if (!s) return false;
           var st = s.status || [];
-          if (st.indexOf('Verified') >= 0) return true;
-          if (!s.statusDone) return false;
-          return st.indexOf('Digital Review') >= 0 || st.indexOf('Follow-up') >= 0;
+          if (typeof isDigitalReviewDone === 'function' && st.indexOf('Digital Review') >= 0 && isDigitalReviewDone(s)) return true;
+          if (typeof isEntityStatusCompleted === 'function' && st.indexOf('Follow-up') >= 0 && isEntityStatusCompleted(s, 'Follow-up')) return true;
+          if (typeof isSpecimenWorkflowCompleted === 'function' && isSpecimenWorkflowCompleted(s)) return true;
+          return st.indexOf('Verified') >= 0;
         }
-        function isCompleted(s) { return !!(s.statusDone || (s.status && s.status.indexOf('Verified') !== -1)); }
         if (sortKey === 'id') {
           filteredList.sort(function (a, b) {
             if (specimenStatusShowsCheckmark(a) !== specimenStatusShowsCheckmark(b)) return specimenStatusShowsCheckmark(a) ? 1 : -1;
@@ -380,8 +485,8 @@
         statuses.forEach(function (st) {
           if (st === 'Verified') return;
           var style = STATUS_STYLES[st] || 'bg-gray-100 text-gray-800';
-          var drCompleted = st === 'Digital Review' && specimen.statusDone;
-          var fuCompleted = st === 'Follow-up' && specimen.statusDone;
+          var drCompleted = st === 'Digital Review' && typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(specimen);
+          var fuCompleted = st === 'Follow-up' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(specimen, 'Follow-up');
           if (drCompleted || fuCompleted) style = 'bg-green-100 text-green-800';
           html += '<span class="status-capsule ' + style + '">';
           if (drCompleted || fuCompleted) html += '<span class="material-symbols-outlined text-xs mr-1">check</span>';
@@ -393,7 +498,7 @@
 
       function rowClass(s, index) {
         if (s.locked) return 'bg-striped';
-        if (s.statusDone) return 'bg-gray-50';
+        if (typeof isSpecimenWorkflowCompleted === 'function' && isSpecimenWorkflowCompleted(s)) return 'bg-gray-50';
         return index % 2 ? 'bg-gray-50' : 'bg-white';
       }
 
@@ -580,16 +685,28 @@
       });
 
       document.querySelectorAll('.status-filter').forEach(function (cb) {
-        cb.addEventListener('change', renderTable);
+        cb.addEventListener('change', function () {
+          renderTable();
+          persistSpecimenListUiState();
+        });
       });
 
       document.querySelectorAll('.mode-tab').forEach(function (tab) {
         tab.addEventListener('click', function () {
           var mode = this.dataset.mode;
-          setModeTabVisual(mode);
-          var defaults = MODE_DEFAULT_STATUS[mode === 'digital' ? 'digital' : 'entity'];
-          setStatusFilterCheckboxes(defaults);
+          var isSameMode = currentMode === mode;
+          if (isSameMode) {
+            setModeTabVisual(null);
+            persistModeSelection(null);
+            setStatusFilterCheckboxes(SPECIMEN_LIST_DEMO.statusFiltersAll);
+          } else {
+            setModeTabVisual(mode);
+            persistModeSelection(mode);
+            var defaults = MODE_DEFAULT_STATUS[mode === 'digital' ? 'digital' : 'entity'];
+            setStatusFilterCheckboxes(defaults);
+          }
           renderTable();
+          persistSpecimenListUiState();
           if (filteredList.length) selectRow(filteredList[0].id);
         });
       });
@@ -601,17 +718,39 @@
           else { sortKey = key; sortAsc = true; }
           updateSortUI();
           renderTable();
+          persistSpecimenListUiState();
           if (filteredList.length && currentSpecimenId) selectRow(currentSpecimenId);
         });
       });
 
-      document.getElementById('btn-search').addEventListener('click', function () { renderTable(); });
+      document.getElementById('btn-search').addEventListener('click', function () {
+        renderTable();
+        persistSpecimenListUiState();
+      });
       document.getElementById('specimen-search').addEventListener('keydown', function (e) {
         if (e.key === 'Enter') document.getElementById('btn-search').click();
       });
-      document.getElementById('exact-match').addEventListener('change', renderTable);
-      document.getElementById('filter-department').addEventListener('change', renderTable);
-      document.getElementById('filter-machine').addEventListener('change', renderTable);
+      document.getElementById('specimen-search').addEventListener('input', persistSpecimenListUiState);
+      document.getElementById('analysis-date-start').addEventListener('change', function () {
+        renderTable();
+        persistSpecimenListUiState();
+      });
+      document.getElementById('analysis-date-end').addEventListener('change', function () {
+        renderTable();
+        persistSpecimenListUiState();
+      });
+      document.getElementById('exact-match').addEventListener('change', function () {
+        renderTable();
+        persistSpecimenListUiState();
+      });
+      document.getElementById('filter-department').addEventListener('change', function () {
+        renderTable();
+        persistSpecimenListUiState();
+      });
+      document.getElementById('filter-machine').addEventListener('change', function () {
+        renderTable();
+        persistSpecimenListUiState();
+      });
 
       document.getElementById('font-smaller').addEventListener('click', function () {
         if (typeof adjustAppFontLevel === 'function') fontLevel = adjustAppFontLevel(-1);
@@ -697,6 +836,7 @@
       applySpecimenListUiDemoDefaults();
       updateSortUI();
       renderTable();
+      persistSpecimenListUiState();
       if (filteredList.length) selectRow(filteredList[0].id);
 
       if (window.Tutorial) {

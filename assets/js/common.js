@@ -265,28 +265,80 @@ const STATUS_STYLES = {
   'Locked': 'bg-gray-200 text-gray-800 border border-gray-300'
 };
 
-// 模式預設勾選的狀態（數位閱片 / 實體作業）；兩種模式預設都含 Verified，使用者可自行取消勾選以隱藏已完成檢體
+// 模式預設勾選的狀態（數位閱片 / 實體作業）
 const MODE_DEFAULT_STATUS = {
-  digital: ['Digital Review', 'Verified'],
-  entity: ['Follow-up', 'PLT Check', 'AI Alert', 'Manual Alert', 'Verified']
+  digital: ['Digital Review'],
+  entity: ['Follow-up', 'PLT Check', 'AI Alert', 'Manual Alert']
 };
 
-/** 手動增刪 flag／簽核完成狀態覆寫（舊版僅存陣列；新版為 { status, statusDone }） */
+/** 手動增刪 flag／簽核完成狀態覆寫（新版：status + workflowDone） */
 var APP_SPECIMEN_STATUS_STORAGE_KEY = 'blood-morphology-specimen-status';
+var ENTITY_REVIEW_STATUS_SET = ['PLT Check', 'Follow-up', 'AI Alert', 'Manual Alert'];
+
+function normalizeWorkflowDone(rawWorkflow, rawStatusDone) {
+  var digitalReview = false;
+  var entityReview = false;
+  if (rawWorkflow && typeof rawWorkflow === 'object') {
+    digitalReview = !!rawWorkflow.digitalReview;
+    entityReview = !!rawWorkflow.entityReview;
+  }
+  if (rawStatusDone) {
+    // 舊版 statusDone 視為整體完成，兩條流程都視為已完成
+    digitalReview = true;
+    entityReview = true;
+  }
+  return { digitalReview: digitalReview, entityReview: entityReview };
+}
 
 function normalizeStatusStorageEntry(raw) {
-  if (raw == null) return { status: [], statusDone: false, editor: '' };
+  if (raw == null) return { status: [], statusDone: false, workflowDone: normalizeWorkflowDone(null, false), editor: '' };
   if (Array.isArray(raw)) {
-    return { status: raw.slice().filter(function (x) { return x !== 'Verified'; }), statusDone: false, editor: '' };
+    return {
+      status: raw.slice().filter(function (x) { return x !== 'Verified'; }),
+      statusDone: false,
+      workflowDone: normalizeWorkflowDone(null, false),
+      editor: ''
+    };
   }
   if (raw && typeof raw === 'object' && Array.isArray(raw.status)) {
     return {
       status: raw.status.slice().filter(function (x) { return x !== 'Verified'; }),
       statusDone: !!raw.statusDone,
+      workflowDone: normalizeWorkflowDone(raw.workflowDone, raw.statusDone),
       editor: typeof raw.editor === 'string' ? raw.editor : ''
     };
   }
-  return { status: [], statusDone: false, editor: '' };
+  return { status: [], statusDone: false, workflowDone: normalizeWorkflowDone(null, false), editor: '' };
+}
+
+function hasStatus(spec, statusKey) {
+  if (!spec || !Array.isArray(spec.status)) return false;
+  return spec.status.indexOf(statusKey) !== -1;
+}
+
+function hasAnyEntityReviewTask(spec) {
+  if (!spec || !Array.isArray(spec.status)) return false;
+  return spec.status.some(function (s) { return ENTITY_REVIEW_STATUS_SET.indexOf(s) !== -1; });
+}
+
+function isDigitalReviewDone(spec) {
+  if (!spec) return false;
+  if (!hasStatus(spec, 'Digital Review')) return true;
+  var wf = normalizeWorkflowDone(spec.workflowDone, spec.statusDone);
+  return !!wf.digitalReview;
+}
+
+function isEntityReviewDone(spec) {
+  if (!spec) return false;
+  if (!hasAnyEntityReviewTask(spec)) return true;
+  var wf = normalizeWorkflowDone(spec.workflowDone, spec.statusDone);
+  return !!wf.entityReview;
+}
+
+function isEntityStatusCompleted(spec, statusKey) {
+  if (!spec) return false;
+  if (ENTITY_REVIEW_STATUS_SET.indexOf(statusKey) === -1) return false;
+  return isEntityReviewDone(spec);
 }
 
 function persistSpecimenStatusOverride(specimenId, statusArray, options) {
@@ -300,9 +352,20 @@ function persistSpecimenStatusOverride(specimenId, statusArray, options) {
     if (!map || typeof map !== 'object') map = {};
     var prev = normalizeStatusStorageEntry(map[specimenId]);
     var nextStatus = Array.isArray(statusArray) ? statusArray.slice().filter(function (x) { return x !== 'Verified'; }) : [];
-    var nextDone = options && options.statusDone !== undefined ? !!options.statusDone : prev.statusDone;
+    var workflowInput = prev.workflowDone;
+    if (options && options.workflowDone && typeof options.workflowDone === 'object') {
+      workflowInput = {
+        digitalReview: options.workflowDone.digitalReview !== undefined ? options.workflowDone.digitalReview : prev.workflowDone.digitalReview,
+        entityReview: options.workflowDone.entityReview !== undefined ? options.workflowDone.entityReview : prev.workflowDone.entityReview
+      };
+    }
+    var nextWorkflowDone = normalizeWorkflowDone(
+      workflowInput,
+      options && options.statusDone !== undefined ? !!options.statusDone : prev.statusDone
+    );
+    var nextDone = !!(nextWorkflowDone.digitalReview && nextWorkflowDone.entityReview);
     var nextEditor = options && options.editor !== undefined ? options.editor : prev.editor;
-    map[specimenId] = { status: nextStatus, statusDone: nextDone, editor: nextEditor || '' };
+    map[specimenId] = { status: nextStatus, statusDone: nextDone, workflowDone: nextWorkflowDone, editor: nextEditor || '' };
     localStorage.setItem(APP_SPECIMEN_STATUS_STORAGE_KEY, JSON.stringify(map));
   } catch (e) {}
 }
@@ -319,7 +382,8 @@ function applySpecimenStatusOverridesFromStorage() {
       if (!spec) return;
       var ent = normalizeStatusStorageEntry(map[id]);
       spec.status = ent.status;
-      if (ent.statusDone) spec.statusDone = true;
+      spec.workflowDone = normalizeWorkflowDone(ent.workflowDone, ent.statusDone);
+      spec.statusDone = !!(spec.workflowDone.digitalReview && spec.workflowDone.entityReview);
       if (ent.editor) spec.editor = ent.editor;
     });
   } catch (e) {}
@@ -335,14 +399,12 @@ function getCurrentUserAccount() {
 }
 
 /**
- * 檢體是否為「已完成」狀態（數位閱片／Follow-up 簽核完成 statusDone，或舊版含 Verified）。
+ * 檢體是否為「已完成」狀態：數位閱片與實體作業兩條流程都完成。
  * 規則：已完成時列表時效顯示與排序皆視為 0。
  */
 function isSpecimenWorkflowCompleted(spec) {
   if (!spec) return false;
-  if (spec.statusDone) return true;
-  var st = spec.status || [];
-  return st.indexOf('Verified') !== -1;
+  return isDigitalReviewDone(spec) && isEntityReviewDone(spec);
 }
 
 /** 列表／依時效排序用：已完成一律 0；未完成則用 urgency 欄位（空則空字串） */
@@ -356,5 +418,11 @@ function getSpecimenDisplayUrgency(spec) {
 
 (function () {
   loadLeaveThresholdsFromStorage();
+  if (typeof APP_DATABASE !== 'undefined' && Array.isArray(APP_DATABASE.specimens)) {
+    APP_DATABASE.specimens.forEach(function (spec) {
+      spec.workflowDone = normalizeWorkflowDone(spec.workflowDone, spec.statusDone);
+      spec.statusDone = !!(spec.workflowDone.digitalReview && spec.workflowDone.entityReview);
+    });
+  }
   applySpecimenStatusOverridesFromStorage();
 })();

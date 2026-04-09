@@ -64,7 +64,8 @@
     return APP_DATABASE.specimens.filter(function (s) {
       if (s.locked) return false;
       var st = s.status || [];
-      return st.indexOf('Digital Review') >= 0 && !s.statusDone;
+      var done = typeof isDigitalReviewDone === 'function' ? isDigitalReviewDone(s) : !!s.statusDone;
+      return st.indexOf('Digital Review') >= 0 && !done;
     });
   }
 
@@ -261,11 +262,11 @@
         var prefixIcon = '';
         if (s === 'AI Alert') style = 'bg-orange-100 text-orange-800';
         else if (s === 'PLT Check') style = 'bg-blue-100 text-blue-800';
-        else if (s === 'Follow-up' && specimen.statusDone) {
+        else if (s === 'Follow-up' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(specimen, 'Follow-up')) {
           style = 'bg-green-100 text-green-800';
           prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
         } else if (s === 'Follow-up') style = 'bg-red-100 text-red-800';
-        else if (s === 'Digital Review' && specimen.statusDone) {
+        else if (s === 'Digital Review' && typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(specimen)) {
           style = 'bg-green-100 text-green-800';
           prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
         } else if (s === 'Digital Review') style = 'bg-purple-100 text-purple-800';
@@ -399,13 +400,12 @@
     /** Manual Alert 與 Digital Review 互斥；其餘狀態保留 */
     if (status === 'Manual Alert') {
       st = st.filter(function (s) { return s !== 'Digital Review'; });
-      currentSpecimen.statusDone = false;
     } else if (status === 'Digital Review') {
       st = st.filter(function (s) { return s !== 'Manual Alert'; });
     }
     if (st.indexOf(status) === -1) st.push(status);
     currentSpecimen.status = st;
-    var persistOpts = status === 'Manual Alert' ? { statusDone: false } : undefined;
+    var persistOpts = status === 'Manual Alert' ? { workflowDone: { entityReview: false } } : undefined;
     if (typeof window.persistSpecimenStatusOverride === 'function') {
       window.persistSpecimenStatusOverride(currentSpecimen.id, currentSpecimen.status, persistOpts);
     }
@@ -857,26 +857,38 @@
     // 從報告核發 iframe 接收簽核完成事件
     window.addEventListener('message', function (e) {
       var data = e.data || {};
-      if (!data || data.type !== 'reportVerified') return;
+      if (!data) return;
+      if (data.type === 'reportCancel') {
+        var cancelModal = document.getElementById('report-issue-modal');
+        if (cancelModal) cancelModal.classList.add('hidden');
+        return;
+      }
+      if (data.type !== 'reportVerified') return;
       var id = data.specimenId || currentSpecimenId;
       if (!id || typeof APP_DATABASE === 'undefined' || !APP_DATABASE.specimens) return;
       var spec = APP_DATABASE.specimens.find(function (s) { return s.id === id; });
       if (!spec) return;
       if (!Array.isArray(spec.status)) spec.status = [];
-      // 標記此檢體已完成數位閱片簽核：不另加 Verified，改以 statusDone + Digital Review 綠勾呈現
-      spec.statusDone = true;
+      // 標記此檢體已完成「數位閱片」流程；實體作業是否完成由 entityReview 決定
+      if (!spec.workflowDone || typeof spec.workflowDone !== 'object') spec.workflowDone = {};
+      spec.workflowDone.digitalReview = true;
+      if (typeof spec.workflowDone.entityReview !== 'boolean') {
+        spec.workflowDone.entityReview = (typeof hasAnyEntityReviewTask === 'function') ? !hasAnyEntityReviewTask(spec) : false;
+      }
+      spec.statusDone = !!(spec.workflowDone.digitalReview && spec.workflowDone.entityReview);
       if (Array.isArray(spec.status)) {
         spec.status = spec.status.filter(function (x) { return x !== 'Verified'; });
       }
       var editorAccount = typeof getCurrentUserAccount === 'function' ? getCurrentUserAccount() : '';
       if (editorAccount) spec.editor = editorAccount;
       if (typeof window.persistSpecimenStatusOverride === 'function') {
-        window.persistSpecimenStatusOverride(id, spec.status, { statusDone: true, editor: editorAccount });
+        window.persistSpecimenStatusOverride(id, spec.status, { workflowDone: spec.workflowDone, editor: editorAccount });
       }
       notifyReportIframeToRefresh();
       if (currentSpecimen && currentSpecimen.id === id) {
         currentSpecimen.status = spec.status.slice();
-        currentSpecimen.statusDone = true;
+        currentSpecimen.workflowDone = { digitalReview: !!spec.workflowDone.digitalReview, entityReview: !!spec.workflowDone.entityReview };
+        currentSpecimen.statusDone = !!(currentSpecimen.workflowDone.digitalReview && currentSpecimen.workflowDone.entityReview);
         if (editorAccount) currentSpecimen.editor = editorAccount;
         digitalReviewList = getDigitalReviewList();
         renderSidebar();

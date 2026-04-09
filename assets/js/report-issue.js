@@ -216,11 +216,11 @@
         var prefixIcon = '';
         if (s === 'AI Alert' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['AI Alert'] || style;
         else if (s === 'PLT Check' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['PLT Check'] || style;
-        else if (s === 'Follow-up' && spec.statusDone) {
+        else if (s === 'Follow-up' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(spec, 'Follow-up')) {
           style = 'bg-green-100 text-green-800';
           prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
         } else if (s === 'Follow-up' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['Follow-up'] || style;
-        else if (s === 'Digital Review' && spec.statusDone) {
+        else if (s === 'Digital Review' && typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(spec)) {
           style = 'bg-green-100 text-green-800';
           prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
         } else if (s === 'Digital Review' && typeof STATUS_STYLES !== 'undefined') {
@@ -231,10 +231,6 @@
         return '<span class="inline-flex items-center px-3 py-0.5 rounded-full text-[11px] font-semibold ' + style + '">' + prefixIcon + label + '</span>';
       }).join('');
       statusWrap.innerHTML = html;
-    }
-    if (window.self !== window.top) {
-      var internalClose = document.getElementById('btn-close');
-      if (internalClose) internalClose.style.display = 'none';
     }
     applyRiskBanner(spec);
     buildWbcTable(spec);
@@ -269,9 +265,9 @@
       refreshReportFromParent();
     });
 
-    var cancelBtn = document.getElementById('btn-cancel');
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', function () {
+    var closeBtn = document.getElementById('btn-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
         if (window.self !== window.top && window.parent) {
           window.parent.postMessage({ type: 'reportCancel' }, '*');
         } else if (typeof goToSpecimenList === 'function') {
@@ -283,7 +279,6 @@
     var confirmBtn = document.getElementById('confirm-btn');
     if (confirmBtn) {
       confirmBtn.addEventListener('click', function () {
-        if (!confirm('確認要簽核並核發此報告嗎？')) return;
         var s = getSpecimen();
         var sid = s ? s.id : '';
         if (window.self !== window.top && window.parent) {
