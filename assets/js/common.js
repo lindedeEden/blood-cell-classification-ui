@@ -178,6 +178,28 @@ function isAbnormalMetricValue(key, value) {
   return false;
 }
 
+/**
+ * 留單新發判定（嚴格同 key）：
+ * - current 達門檻且 prev 未達門檻 => true
+ * - 其餘 => false
+ */
+function isNewLeaveConditionByKey(key, currentValue, prevValue) {
+  return isAbnormalMetricValue(key, currentValue) && !isAbnormalMetricValue(key, prevValue);
+}
+
+/** 任一留單 key 為新發（嚴格同 key） */
+function hasAnyNewLeaveCondition(currentMetrics, prevMetrics) {
+  if (typeof LEAVE_THRESHOLDS === 'undefined') return false;
+  var keys = Object.keys(LEAVE_THRESHOLDS);
+  var cur = currentMetrics || {};
+  var prev = prevMetrics || {};
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (isNewLeaveConditionByKey(k, cur[k], prev[k])) return true;
+  }
+  return false;
+}
+
 function parseFlexibleDateTime(v) {
   if (!v) return null;
   var s = String(v).trim().replace(/\//g, '-').replace('T', ' ');
@@ -212,6 +234,29 @@ function getPrevReportHeaderLabel(spec, baseLabel) {
   return base + '（' + days + '天前）';
 }
 
+/** 從報告核發「改為人工鏡檢」返回檢體管理時，顯示一次性提示（sessionStorage 單次消耗） */
+var MANUAL_ALERT_TOAST_STORAGE_KEY = 'blood-morphology-manual-alert-toast';
+
+function queueManualAlertToast(specimenId) {
+  if (!specimenId) return;
+  try {
+    sessionStorage.setItem(MANUAL_ALERT_TOAST_STORAGE_KEY, JSON.stringify({ specimenId: String(specimenId) }));
+  } catch (e) {}
+}
+
+/** 讀取並清除佇列；若無則回傳 null */
+function consumeManualAlertToastQueue() {
+  try {
+    var raw = sessionStorage.getItem(MANUAL_ALERT_TOAST_STORAGE_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(MANUAL_ALERT_TOAST_STORAGE_KEY);
+    var parsed = JSON.parse(raw);
+    return parsed && parsed.specimenId ? String(parsed.specimenId) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 // 檢體清單：由數據資料庫提供，未載入時為空陣列
 var MOCK_SPECIMENS = (typeof APP_DATABASE !== 'undefined' && APP_DATABASE.specimens) ? APP_DATABASE.specimens : [];
 
@@ -221,10 +266,34 @@ function getSpecimenIdFromUrl() {
   return params.get('specimen') || params.get('id') || '';
 }
 
-// 導向影像檢視頁
-function goToImageReview(specimenId) {
+// 導向影像檢視頁（opts.readonly 為 true 時附加 readonly=1，供唯讀檢視）
+function goToImageReview(specimenId, opts) {
+  if (!specimenId || typeof getSpecimenById !== 'function') return false;
+  var spec = getSpecimenById(specimenId);
+  if (spec && spec.locked && !(opts && opts.readonly)) return false;
   const base = getBasePath();
-  window.location.href = base + '影像檢視與細胞編輯.html?specimen=' + encodeURIComponent(specimenId);
+  let url = base + '影像檢視與細胞編輯.html?specimen=' + encodeURIComponent(specimenId);
+  if (opts && opts.readonly) url += '&readonly=1';
+  window.location.href = url;
+  return true;
+}
+
+/**
+ * 退回 Digital Review（將數位流程重開，供檢體管理「退回」動作呼叫）。
+ * 會寫入與 persistSpecimenStatusOverride 相同之 localStorage 覆寫。
+ */
+function reopenDigitalReview(specimenId) {
+  if (!specimenId || typeof getSpecimenById !== 'function') return false;
+  var spec = getSpecimenById(specimenId);
+  if (!spec) return false;
+  if (!spec.workflowDone || typeof spec.workflowDone !== 'object') spec.workflowDone = { digitalReview: false, entityReview: false, entityStatusDone: {} };
+  spec.workflowDone.digitalReview = false;
+  spec.statusDone = computeSpecimenStatusDoneFromWorkflow(spec.status, spec.workflowDone);
+  spec.editor = '';
+  if (typeof persistSpecimenStatusOverride === 'function') {
+    persistSpecimenStatusOverride(specimenId, spec.status, { workflowDone: spec.workflowDone, editor: '' });
+  }
+  return true;
 }
 
 // 導向報告核發頁（可帶檢體 ID）
@@ -399,10 +468,19 @@ function persistSpecimenStatusOverride(specimenId, statusArray, options) {
       workflowInput,
       options && options.statusDone !== undefined ? !!options.statusDone : prev.statusDone
     );
-    var nextDone = !!(nextWorkflowDone.digitalReview && nextWorkflowDone.entityReview);
+    var nextDone = computeSpecimenStatusDoneFromWorkflow(nextStatus, nextWorkflowDone);
     var nextEditor = options && options.editor !== undefined ? options.editor : prev.editor;
-    map[specimenId] = { status: nextStatus, statusDone: nextDone, workflowDone: nextWorkflowDone, editor: nextEditor || '' };
+    if (!nextDone) nextEditor = '';
+    map[specimenId] = { status: nextStatus, statusDone: nextDone, workflowDone: nextWorkflowDone, editor: (nextEditor || '') };
     localStorage.setItem(APP_SPECIMEN_STATUS_STORAGE_KEY, JSON.stringify(map));
+    if (typeof APP_DATABASE !== 'undefined' && APP_DATABASE.specimens) {
+      var live = APP_DATABASE.specimens.find(function (s) { return s.id === specimenId; });
+      if (live) {
+        live.statusDone = nextDone;
+        live.workflowDone = nextWorkflowDone;
+        live.editor = nextEditor || '';
+      }
+    }
   } catch (e) {}
 }
 
@@ -419,8 +497,9 @@ function applySpecimenStatusOverridesFromStorage() {
       var ent = normalizeStatusStorageEntry(map[id]);
       spec.status = ent.status;
       spec.workflowDone = normalizeWorkflowDone(ent.workflowDone, ent.statusDone);
-      spec.statusDone = !!(spec.workflowDone.digitalReview && spec.workflowDone.entityReview);
-      if (ent.editor) spec.editor = ent.editor;
+      spec.statusDone = computeSpecimenStatusDoneFromWorkflow(spec.status, spec.workflowDone);
+      if (!spec.statusDone) spec.editor = '';
+      else spec.editor = typeof ent.editor === 'string' ? ent.editor : '';
     });
   } catch (e) {}
 }
@@ -443,6 +522,19 @@ function isSpecimenWorkflowCompleted(spec) {
   return isDigitalReviewDone(spec) && isEntityReviewDone(spec);
 }
 
+/**
+ * 與 isSpecimenWorkflowCompleted 一致地計算 statusDone（不依賴「兩個 workflow 旗標必須皆為 true」）。
+ * 例如：僅 AI Alert 時不需數位閱片；僅 Digital Review 時不需實體膠囊。
+ * 評估時傳入 statusDone: false，避免舊版 statusDone 旗標干擾 normalize。
+ */
+function computeSpecimenStatusDoneFromWorkflow(statusArr, workflowDoneObj) {
+  return isSpecimenWorkflowCompleted({
+    status: Array.isArray(statusArr) ? statusArr.slice() : [],
+    workflowDone: workflowDoneObj || { digitalReview: false, entityReview: false, entityStatusDone: {} },
+    statusDone: false
+  });
+}
+
 /** 列表／依時效排序用：已完成一律 0；未完成則用 urgency 欄位（空則空字串） */
 function getSpecimenDisplayUrgency(spec) {
   if (!spec) return '';
@@ -457,8 +549,15 @@ function getSpecimenDisplayUrgency(spec) {
   if (typeof APP_DATABASE !== 'undefined' && Array.isArray(APP_DATABASE.specimens)) {
     APP_DATABASE.specimens.forEach(function (spec) {
       spec.workflowDone = normalizeWorkflowDone(spec.workflowDone, spec.statusDone);
-      spec.statusDone = !!(spec.workflowDone.digitalReview && spec.workflowDone.entityReview);
+      spec.statusDone = computeSpecimenStatusDoneFromWorkflow(spec.status, spec.workflowDone);
     });
   }
   applySpecimenStatusOverridesFromStorage();
+  if (typeof APP_DATABASE !== 'undefined' && Array.isArray(APP_DATABASE.specimens)) {
+    APP_DATABASE.specimens.forEach(function (spec) {
+      if (typeof isSpecimenWorkflowCompleted === 'function' && !isSpecimenWorkflowCompleted(spec)) {
+        spec.editor = '';
+      }
+    });
+  }
 })();

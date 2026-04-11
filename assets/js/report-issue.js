@@ -118,29 +118,71 @@
     return false;
   }
 
-  function applyRiskBanner(spec) {
+  function getEffectiveMetricsForRisk(spec) {
     var metrics = spec.metrics || {};
     var editedMetrics = spec.editedMetrics || {};
-    // 有人員編輯且與 AI 不同 → 以人員編輯結果判定；無人編輯或與 AI 相同（未更動）→ 以 AI 判定
     var hasEdited = Object.keys(editedMetrics).length > 0;
     var useEdited = hasEdited && editedDiffersFromAi(editedMetrics, metrics);
-    var effective = useEdited ? editedMetrics : metrics;
-    var keys = typeof LEAVE_THRESHOLDS !== 'undefined' ? Object.keys(LEAVE_THRESHOLDS) : [];
-    var hasLeave = false;
-    keys.forEach(function (k) {
-      if (typeof isAbnormalMetricValue === 'function' && isAbnormalMetricValue(k, effective[k])) hasLeave = true;
-    });
+    return useEdited ? editedMetrics : metrics;
+  }
+
+  function getRiskState(spec, effectiveMetrics) {
+    var prev = spec.prevReport || {};
+    var effective = effectiveMetrics || {};
+    var hasNewLeave = typeof hasAnyNewLeaveCondition === 'function'
+      ? hasAnyNewLeaveCondition(effective, prev)
+      : false;
+    var hasLeaveNow = false;
+    if (typeof LEAVE_THRESHOLDS !== 'undefined' && typeof isAbnormalMetricValue === 'function') {
+      var keys = Object.keys(LEAVE_THRESHOLDS);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (isAbnormalMetricValue(k, effective[k])) {
+          hasLeaveNow = true;
+          break;
+        }
+      }
+    }
+    return {
+      hasNewLeave: hasNewLeave,
+      hasLeaveNow: hasLeaveNow,
+      isPersistentLeave: !hasNewLeave && hasLeaveNow
+    };
+  }
+
+  function addManualAlertFromReport(spec) {
+    if (!spec || !spec.id) return;
+    if (!Array.isArray(spec.status)) spec.status = [];
+    var st = spec.status.slice();
+    st = st.filter(function (s) { return s !== 'Digital Review'; });
+    if (st.indexOf('Manual Alert') === -1) st.push('Manual Alert');
+    spec.status = st;
+    if (typeof persistSpecimenStatusOverride === 'function') {
+      persistSpecimenStatusOverride(spec.id, spec.status, { workflowDone: { entityReview: false } });
+    }
+    refreshReportFromParent();
+  }
+
+  function applyRiskBanner(spec) {
+    var effective = getEffectiveMetricsForRisk(spec);
+    var risk = getRiskState(spec, effective);
     var banner = document.getElementById('risk-banner');
     var icon = document.getElementById('risk-icon');
     var text = document.getElementById('risk-text');
     if (!banner || !icon || !text) return;
     banner.className = 'px-6 py-2.5 flex items-center justify-between gap-4 shrink-0 border-b';
-    if (hasLeave) {
+    if (risk.hasNewLeave) {
       banner.className += ' bg-medical-red border-medical-red/20';
       icon.textContent = 'warning';
       icon.className = 'material-symbols-outlined text-white fill-1 scale-100';
       text.className = 'text-md font-bold leading-tight tracking-tight text-white';
-      text.textContent = '留單警示：已達留單標準，請確認是否需人工鏡檢或留單後再核發';
+      text.textContent = '留單警示：本次出現新發留單條件，請確認是否需人工鏡檢或留單後再核發';
+    } else if (risk.hasLeaveNow) {
+      banner.className += ' bg-amber-500 border-amber-500/20';
+      icon.textContent = 'info';
+      icon.className = 'material-symbols-outlined text-white';
+      text.className = 'text-md font-bold leading-tight tracking-tight text-white';
+      text.textContent = '延續性異常：前次同留單條件已存在，不重複留單';
     } else {
       banner.className += ' bg-emerald-600 border-emerald-600/20';
       icon.textContent = 'check_circle';
@@ -196,6 +238,8 @@
 
   function renderReportView(spec) {
     if (!spec) return;
+    var effective = getEffectiveMetricsForRisk(spec);
+    var risk = getRiskState(spec, effective);
     var title = document.getElementById('report-specimen-id');
     if (title) title.textContent = spec.id || '';
     var prevWbcHeader = document.getElementById('wbc-prev-report-header');
@@ -232,6 +276,8 @@
       }).join('');
       statusWrap.innerHTML = html;
     }
+    var manualAlertBtn = document.getElementById('manual-alert-btn');
+    if (manualAlertBtn) manualAlertBtn.classList.toggle('hidden', !risk.hasNewLeave);
     applyRiskBanner(spec);
     buildWbcTable(spec);
     buildOtherTable(spec);
@@ -281,9 +327,34 @@
       confirmBtn.addEventListener('click', function () {
         var s = getSpecimen();
         var sid = s ? s.id : '';
+        var navigateNextDigitalReview = false;
+        if (s) {
+          var effective = getEffectiveMetricsForRisk(s);
+          var risk = getRiskState(s, effective);
+          // 綠色/黃色簽核後，直接銜接下一筆；紅色（新發留單）不自動跳轉。
+          navigateNextDigitalReview = !risk.hasNewLeave;
+        }
         if (window.self !== window.top && window.parent) {
-          window.parent.postMessage({ type: 'reportVerified', specimenId: sid }, '*');
+          window.parent.postMessage({ type: 'reportVerified', specimenId: sid, navigateNextDigitalReview: navigateNextDigitalReview }, '*');
         } else if (typeof goToSpecimenList === 'function') {
+          goToSpecimenList();
+        }
+      });
+    }
+
+    var manualAlertBtn = document.getElementById('manual-alert-btn');
+    if (manualAlertBtn) {
+      manualAlertBtn.addEventListener('click', function () {
+        var s = getSpecimen();
+        if (!s) return;
+        var effective = getEffectiveMetricsForRisk(s);
+        var risk = getRiskState(s, effective);
+        if (!risk.hasNewLeave) return;
+        addManualAlertFromReport(s); // 先刷新本頁膠囊，再關閉並返回檢體管理
+        if (window.self !== window.top && window.parent) {
+          window.parent.postMessage({ type: 'reportManualAlert', specimenId: s.id }, '*');
+        } else if (typeof goToSpecimenList === 'function') {
+          if (typeof queueManualAlertToast === 'function') queueManualAlertToast(s.id);
           goToSpecimenList();
         }
       });

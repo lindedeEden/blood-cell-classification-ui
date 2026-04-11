@@ -1,10 +1,12 @@
 # 血球型態分類軟體介面（前端 Demo）
 
-本專案是「血球型態分類軟體」的前端介面 Demo，模擬醫檢師在實務工作中從：
+本專案為**林口長庚醫院檢驗醫學科血液組**血球型態閱片流程之**前端示範（Demo）**，模擬醫檢師從：
 
 **登入 → 檢體管理 → 影像檢視與細胞編輯 → 報告核發**
 
-的一整套操作流程，所有資料來自前端內建的模擬資料庫 `assets/data/database.js`。
+的完整操作路徑。資料來自內建 **`assets/data/database.js`**；部分狀態會寫入瀏覽器 **本機儲存**，以便連續操作（詳見下文「本機資料與重設」）。
+
+更精簡的條列說明可同時參考 **`血球分類軟體介面說明.txt`**。
 
 ---
 
@@ -12,170 +14,124 @@
 
 ```text
 血球分類軟體介面設計專案/
-├── index.html                      # 登入頁（demo，用帳密 admin/admin 或 user/user）
+├── index.html                      # 登入頁（demo：admin/admin 或 user/user）
 ├── 檢體管理.html                   # 檢體管理主介面
-├── 影像檢視與細胞編輯.html         # 影像檢視與細胞編輯介面
-├── 報告核發.html                   # 報告核發介面（在影像檢視頁內以 iframe 彈出）
-├── 血球分類軟體介面說明.txt        # 介面與規格說明
+├── 影像檢視與細胞編輯.html         # 影像閱片與細胞編輯
+├── 報告核發.html                   # 報告核發（由閱片頁以 iframe 彈出）
+├── 血球分類軟體介面說明.txt        # 定稿摘要（條列）
 ├── 附件一  林口長庚醫院留單標準.txt # 留單標準參考
-├── README.md
+├── README.md                       # 本檔：完整說明
 └── assets/
     ├── data/
-    │   └── database.js             # 模擬資料庫（病患 / 檢體 / 指標 / CBC / 其他發現 / 狀態）
+    │   └── database.js             # 模擬資料庫（檢體／指標／CBC／狀態等）
     ├── css/
-    │   └── common.css              # 共用樣式
+    │   ├── common.css
+    │   └── tutorial.css            # 使用教學覆蓋層
     ├── js/
-    │   ├── common.js               # 共用工具、導頁、留單門檻（LEAVE_THRESHOLDS）、字型與狀態持久化等
-    │   ├── login.js                # 登入頁行為
-    │   ├── image-review.js         # 影像檢視與細胞編輯行為（細胞顯示 / 多選 / 拖曳 / 單手模式等）
-    │   └── report-issue.js         # 報告核發頁邏輯（風險橫幅 / 數據表格 / 簽核事件）
+    │   ├── common.js               # 導頁、留單門檻、workflow、狀態持久化等
+    │   ├── login.js
+    │   ├── image-review.js         # 閱片、細胞群組、單手模式、報告 iframe
+    │   ├── report-issue.js         # 報告畫面、風險橫幅、簽核 postMessage
+    │   └── tutorial.js             # 步驟式教學（跨頁狀態）
     └── images/
-        └── README.txt              # 圖片資源說明
+        └── README.txt              # 細胞示意圖放置說明
 ```
 
 ---
 
-## 使用流程
+## 使用流程（定稿）
 
-### 1. 登入 (`index.html`)
+### 1. 登入（`index.html`）
 
-1. 用瀏覽器直接開啟 `index.html`（建議 Chrome / Edge）。
-2. 使用以下任一組帳密登入：
-   - `admin / admin`
-   - `user / user`
-3. 驗證成功後自動導向 `檢體管理.html`。
+1. 以瀏覽器開啟 `index.html`（建議 Chrome / Edge）。
+2. 帳密：`admin / admin` 或 `user / user`。
+3. 成功後寫入 **sessionStorage**（目前登入帳號），並導向 `檢體管理.html`。
+4. **建議務必由此登入**：列表「**編輯人員**」於檢體**整體流程完成**時，會使用登入帳號寫入；未登入則通常為空白。
 
-### 2. 檢體管理 (`檢體管理.html`)
+> **重設 Demo 狀態**：再次登入成功時會清除檢體狀態覆寫鍵（`blood-morphology-specimen-status`），還原為 `database.js` 初始資料，方便重新展示。
 
-- **日期預設**：為方便測試，系統預設檢驗日期為 **2025-08-07 ~ 2025-08-07**。
-- **篩選條件**：
-  - 檢驗日期區間
-  - 送檢單位
-  - 機台 (DI1 / DI2)
-  - 檢體 ID / 病歷號（可選擇完全相符或模糊搜尋）
-  - 狀態（Digital Review / PLT Check / AI Alert / Follow-up / Verified）
-- **模式與條件記憶**：
-  - 點選 `數位閱片` / `實體作業` 會套用模式預設狀態；再點一次同模式可回到全選狀態。
-  - 模式、狀態勾選、日期、單位、機台、搜尋字串、排序條件皆會保存，返回檢體管理後自動還原。
-- **列表操作**：
-  - 單擊一列：右側「檢體總覽」顯示該檢體的病歷號、姓名、生日、科別與 WBC 差異表。
-  - 雙擊一列或點「進入閱片」按鈕：帶著該檢體 ID 進入 `影像檢視與細胞編輯.html?specimen=ID`。
-- **狀態膠囊**：
-  - 依 `database.js` 中 `status` 陣列動態產生，例如 `PLT Check`、`Digital Review`、`AI Alert` 等。
-  - 完成狀態改為分流：`workflowDone.digitalReview`（數位流程）與 `workflowDone.entityReview`（實體流程）。
-  - 在檢體管理可直接點擊實體狀態膠囊（PLT Check / Follow-up / AI Alert / Manual Alert）標記完成；該檢體所有實體狀態都完成時，會自動視為實體流程完成。
-  - 只有「數位 + 實體」皆完成時才視為整體完成（Verified）。
+---
 
-### 3. 影像檢視與細胞編輯 (`影像檢視與細胞編輯.html`)
+### 2. 檢體管理（`檢體管理.html`）
 
-- **檢體資訊**（左側）：
-  - 病歷號 / 姓名(性別) / 生日(年齡) / 科別 / 機台 / 檢體歸位。
-  - 上方小字固定顯示「姓名(性別) / 生日(年齡)」，展開與收合皆可看到。
-- **分析與歷史報告**（左側）：
-  - 由 `metrics` / `prevReport` 生成，異常值會以紅色高亮（規則與規格文件一致）。
-- **細胞區塊（右側主畫面）**：
-  - 依檢體 `metrics` 內各百分比 → 動態產生各群組（Segmented / Lymphocyte / Blast...）與單一通用細胞圖示。
-  - 不再有任何靜態 Demo HTML，完全由 `image-review.js` 控制。
-- **細胞編輯操作**：
-  - 左鍵單點 / Ctrl 多選 / Shift 連續選取（限定在同一群組）。
-  - 單手模式：**按住右鍵不放 + 左鍵點擊多顆 → 放開右鍵跳出分類選單**。
-  - 右鍵打開 context menu，可批次把選取細胞移到新分類。
-  - 拖曳：選取多顆後拖到其他群組，也會一起改分類。
-- **縮放功能**：
-  - 右上方 `- 100% +` 控制整體細胞卡片大小（50%～200%），會重新調整 cell grid 排版，不會重疊。
-- **儲存並核發報告**：
-  - 若尚有未分類細胞或檢視進度 < 100%，會跳出防呆提示。
-  - 條件通過時，會在同一頁開啟覆蓋層，內嵌 `報告核發.html?specimen=ID`。
+- **日期預設**：為便於測試，預設檢驗日期為 **2025-08-07 ~ 2025-08-07**（可改）。
+- **雙模式分流**（可再點同一模式還原較寬鬆篩選）  
+  - **數位閱片模式**：優先列出尚待完成**數位閱片**之檢體（含 `Digital Review` 且未完成者）。  
+  - **實體作業模式**：列出需**實體處置**之檢體（拉片、血小板、AI／人工警示等）。
+- **篩選**：可勾選 PLT Check、AI Alert、Follow-up、Digital Review、Manual Alert、Verified、Locked 等；並支援日期區間、送檢單位、機台、檢體 ID／病歷號（可完全相符）、表頭排序（時效、檢體 ID、分析時間）。
+- **模式與條件記憶**：模式、勾選、日期、單位、機台、搜尋字串、排序等會保存，返回本頁時還原。
+- **列表與右側總覽**：點列可於右側看檢體資訊與流式／AI／前次報告對照；異常達門檻者紅色強調（門檻由右上角 **系統設定** 調整，與閱片側欄、報告風險共用）。
+- **狀態膠囊**：依檢體 `status` 動態產生。實體相關膠囊在 **實體作業** 模式下可**直接點擊**切換完成（PLT Check / Follow-up / AI Alert / Manual Alert）；完成後視覺上轉為綠底打勾（依流程而定）。
+- **Locked**：他人編輯中；列表無法由此進入**編輯**閱片（可搭配唯讀規則，見閱片頁）。
+- **進入閱片**：雙擊列或按「進入閱片」。數位閱片已完成者可「**唯讀檢視**」。符合條件時可於列上**右鍵**將個案**退回 Digital Review**。
+- **「編輯人員」欄**：於檢體 **整體流程完成**（見下節）時寫入最後關閉者；流程退回未完成則清空。完成與否的判定與 **`isSpecimenWorkflowCompleted`** 一致（無須數位或無須實體之檢體，該邊不強制兩個 workflow 旗標皆為 `true`）。
 
-### 4. 報告核發 (`報告核發.html`)
+---
 
-此頁面以 **iframe** 方式嵌在影像檢視頁的彈出視窗內。
+### 3. 整體完成判定（數位 + 實體）
 
-- **頂部標題列**：
-  - 僅顯示：檢體編號 `H5080xxxxx` ＋ 目前狀態膠囊（如 Digital Review / PLT Check 等）。
-  - `Digital Review` 是否顯示綠色打勾，取決於 `workflowDone.digitalReview`。
-  - 實體相關狀態是否顯示綠色打勾，取決於 `workflowDone.entityStatusDone` / `workflowDone.entityReview`。
-- **風險警示橫幅**（紅 / 綠）：
-  - 根據人員編輯或 AI 數據與門檻 `LEAVE_THRESHOLDS`：
-    - **紅色**：已達留單標準（任一留單條件成立，如 WBC/分類百分比閾值，或 Blast / Promyelocyte / Promonocyte / Plasma cell / Abnormal lymphocyte present 等），簽核前請確認是否需人工鏡檢或留單。
-    - **綠色**：未達留單標準。
-- **血球分類計數 (WBC) 表格**：
-  - 依規格分成兩段：
-    - 常見細胞：Band → Seg → Eo → Mono → Baso → Lym → Atypical Lym。
-    - 未成熟與異常細胞：Blast → Promyelocyte → Myelocyte → Metamyelocyte → Hypersegmented → Promonocyte → Plasma cell → Abnormal Lym。
-  - 每列橫向展示四種數據：
-    - Flow Cyt（`spec.flowCyt`）
-    - AI（`spec.metrics`）
-    - 人員編輯（目前同樣從 `metrics` 取值並以藍底高亮，可日後改成真實人工輸入）
-    - 前次報告（`spec.prevReport`）
-  - Flow Cyt 對於未成熟與異常細胞一律顯示 `-`，符合「流式儀不提供這些分類」的規格。
-- **其他發現**：
-  - 表格項目：NRBC, Giant PLT, Megakaryocyte, Smudge cell, Artefact。
-  - 資料來源：`spec.metrics.nrbc` 等與 `prevReport` 中對應欄位（若無則顯示 `-`）。
-- **CBC 數值**：
-  - 顯示 WBC, RBC, Hb, HCT, MCV, MCH, MCHC, PLT。
-  - 來源：`spec.cbc`，其中 WBC / PLT 直接沿用 `metrics.wbc` / `metrics.plt`，確保與 PLT Check 判斷一致。
+- **數位閱片**：若檢體狀態**不含** `Digital Review`，視為無須數位閱片，該邊完成。  
+- **實體作業**：若**沒有任何**實體相關狀態（PLT Check、Follow-up、AI Alert、Manual Alert），視為無須實體流程；否則需完成對應膠囊／流程旗標。  
+- 持久化時 **`statusDone`／是否清空編輯人員** 與 **`computeSpecimenStatusDoneFromWorkflow`**（`common.js`）一致，**不**僅以 `digitalReview && entityReview` 兩個布林簡單相乘，以免「僅 Digital Review」或「僅 AI Alert」等檢體無法正確顯示完成與編輯人員。
 
-- **簽核行為**：
-  - 按「確認並簽核」：
-    - 不再跳出二次確認視窗，直接送出。
-    - 透過 `postMessage` 回傳 `reportVerified` 事件給外層影像檢視頁。
-    - 外層會：
-      - 標記該檢體 `workflowDone.digitalReview = true`（只完成數位流程，不會強制完成實體流程）。
-      - 更新狀態膠囊（Digital Review 轉為綠色＋打勾）。
-      - 從「數位閱片待辦」清單中移除該檢體（若仍有實體待辦，會留在實體作業模式）。
-      - 關閉報告核發 overlay，導回 `檢體管理.html`。
-- **關閉行為**：
-  - 報告核發視窗以右上角 `X` 關閉（已移除下方取消按鈕）。
+---
 
-> 目前沒有真正呼叫 LIS API，上述簽核流程是前端模擬；未來可在 `report-issue.js` 內補上實際 API 呼叫，再於成功後送出 `postMessage`。
+### 4. 影像檢視與細胞編輯（`影像檢視與細胞編輯.html`）
+
+- **唯讀**：若檢體 **Locked**，或數位閱片已完成且進入唯讀情境，頁面會顯示橫幅，**無法**改分類、無法按「儲存並核發報告」。
+- **左側**：返回列表、檢體 ID、狀態膠囊、**Add Flag**（Manual Alert 與 Digital Review 互斥）、搜尋／上一筆／下一筆（待數位閱片清單會**略過 Locked**）、檢體資訊與分析表（門檻同系統設定）。
+- **右側**：細胞依類別分群，達留單門檻者強調；異常群組（如 Blast）置頂並紅色樣式。
+- **操作**：左鍵／Ctrl 多選／同群組 Shift 範圍選；拖曳或右鍵選單改分類；**單手模式**（長按右鍵搭配左鍵錨點與範圍）；細胞縮放 50%～200%。
+- **儲存並核發報告**：進度與 Unidentified 防呆通過後，於同頁開啟覆蓋層，內嵌 **`報告核發.html?specimen=ID`**。人工修訂後之比例可寫入 **`localStorage`**（`editedMetrics:<檢體ID>`），供報告「人員編輯」欄優先顯示。
+
+---
+
+### 5. 報告核發（`報告核發.html`，iframe）
+
+- **版面**：此頁 Tailwind 設定 **`darkMode: 'class'`** 且根節點不帶 `dark`，**固定淺色**，避免與系統深色模式併用時在 Chrome／Edge 呈現不一致。
+- **風險橫幅（三色）**（依 `LEAVE_THRESHOLDS`、前次報告與有效指標判定）  
+  - **紅色**：本次出現**新發**留單條件。  
+  - **黃色**：**延續性**異常（前次已同條件留單）。  
+  - **綠色**：未達留單標準。  
+  若醫檢師曾修改細胞分類，風險判讀可改以與 AI 不同之**人員編輯**為準（見 `report-issue.js`）。
+- **紅色橫幅時**：可顯示「改為人工鏡檢」等動作，將檢體標為 **Manual Alert**、返回列表，轉由**實體作業**待辦處理。
+- **WBC 表**：橫向為流式計數、AI、人員編輯、前次報告；分「常見細胞」與「未成熟與異常細胞」兩段；達門檻列紅色強調。
+- **簽核**：按「確認並簽核」透過 **`postMessage`**（`reportVerified`）通知外層，標記該檢體 **數位閱片流程完成**（`workflowDone.digitalReview`）。  
+  - **綠／黃**：可依設定**帶往下一筆**待數位閱片。  
+  - **紅（新發留單）**：預設**不**自動跳下一筆（見 `report-issue.js`）。
+
+> 未實際呼叫 LIS；正式上線時可在 `report-issue.js` 於成功 API 後再 `postMessage`。
+
+---
+
+### 6. 使用教學（`assets/js/tutorial.js`）
+
+- 由 **檢體管理** 頂部「**使用教學**」開啟；步驟與文案以程式內嵌為準（定稿與 **教學模式** 同步）。
+- 跨頁延續使用 `localStorage` 鍵（如 `bloodCellTutorialPhase`）；完成或跳過後可再次從選單重播。
 
 ---
 
 ## 技術與實作重點
 
-- **樣式 / UI**
-  - Tailwind CSS（CDN，含 `forms`、`container-queries` plugin）。
-  - Google Fonts：`Inter`、`Noto Sans TC`。
-  - Material Symbols 圖示（`<span class="material-symbols-outlined">`）。
-  - 共用樣式：`assets/css/common.css`。
-
-- **資料來源**
-  - 單一模擬資料庫檔案：`assets/data/database.js`，包含：
-    - `APP_DATABASE.specimens`：每筆檢體的病患資訊、狀態、指標、前次報告等。
-    - `departments` / `machines`：供檢體管理篩選用。
-  - 啟動時會額外做：
-    - `ensureOtherFindingsFields()`：補齊 NRBC / Giant PLT / Megakaryocyte / Smudge cell / Artefact 欄位。
-    - `ensureFlowCytData()`：依 `metrics` 產生 `flowCyt`，並對未成熟/異常欄位填 `-`。
-    - `ensureCbcData()`：產生 `cbc` 數值（WBC / PLT 直接沿用原指標）。
-
-- **共用工具 (`assets/js/common.js`)**
-  - `getSpecimenIdFromUrl()`：從 URL query 取出 `specimen` 或 `id`。
-  - `goToImageReview()` / `goToReportIssue()` / `goToSpecimenList()`：統一處理頁面間導頁。
-  - `getSpecimenById()`：從 `MOCK_SPECIMENS`（由資料庫拷貝）中找到對應檢體。
-  - `LEAVE_THRESHOLDS` / `parseMetricNum()` / `isAbnormalMetricValue()`：留單門檻與異常判定，與影像側欄分析表、報告核發橫幅共用。
-  - `workflowDone` 分流狀態工具：
-    - `isDigitalReviewDone()`：判斷數位流程是否完成。
-    - `isEntityReviewDone()` / `isEntityStatusCompleted()`：判斷實體流程與各實體狀態是否完成。
-    - `isSpecimenWorkflowCompleted()`：判斷整體是否完成（數位 + 實體皆完成）。
+- **樣式**：Tailwind CSS（CDN）、Material Symbols、共用 `common.css`／`tutorial.css`。
+- **資料**：`database.js` 啟動時可補齊 flow／CBC／其他發現等欄位（見檔案內註解與函式）。
+- **`common.js`（摘要）**  
+  - 導頁、`getSpecimenById`、`LEAVE_THRESHOLDS`、留單與異常判定。  
+  - `workflowDone`：`isDigitalReviewDone`、`isEntityReviewDone`、`isSpecimenWorkflowCompleted`。  
+  - **`persistSpecimenStatusOverride` / `applySpecimenStatusOverridesFromStorage`**：與列表、簽核、膠囊點擊共用；未完成整體流程時**不保留**「編輯人員」字串。  
+  - **`getCurrentUserAccount()`**：由 sessionStorage 讀取登入帳號。  
+  - **`goToImageReview`**：Locked 且非唯讀時不導向編輯閱片。
+- **`report-issue.js`**：`getRiskState`、`applyRiskBanner`、表格建置、`reportVerified`／`reportManualAlert` 與父頁通訊。
 
 ---
 
 ## 開發與維護建議
 
-- **檔案分工清楚**
-  - `檢體管理.html` 的列表／篩選邏輯目前寫在該頁內嵌腳本；其餘頁為 `login.js`、`image-review.js`、`report-issue.js` 與共用 `common.js`。
+- 列表／篩選主要邏輯在 **`檢體管理.html`** 內嵌腳本；其餘行為分散於上表 JS。
+- 接後端時優先替換 **`database.js`** 資料來源、**`common.js`** 身分與 ID 規則、**`report-issue.js`** 簽核 API。
+- 更新 **HTML 內嵌之 `?v=`** 查詢參數，可避免瀏覽器快取舊版腳本。
 
-- **未來要接後端 API 時**：
-  - 優先修改的地方：
-    - `database.js`：改為從後端拉資料或以 API 回傳取代內建常數。
-    - `common.js`：將頁面跳轉與 `getSpecimenById` 改為與後端 ID 命名規則一致。
-    - `report-issue.js`：「確認並簽核」處改為呼叫 LIS 上傳 API，成功後再 `postMessage`。
-
-- **若要再拆 Tailwind 設定 / 共用 CSS**：
-  - 可以把各 HTML 頁中 `<style type="text/tailwindcss">` 的共用部份集中成一支 CSS 檔，或改為 Tailwind CLI 編譯產出單一 CSS 檔，以利生產環境最佳化。
-
-本 README 以目前最新版的程式碼為準，之後若有再增修功能（例如真正接後端、權限管理、更多報告欄位），建議更新此文件，補上資料流與流程變更說明。
+本 README 以**定稿**程式行為為準；若日後功能變更，請同步更新 **README.md**、**血球分類軟體介面說明.txt** 與 **`tutorial.js`** 教學文案。
 
 ---
 

@@ -37,7 +37,11 @@
     'Hypersegmented': 'hypersegmented',
     'Promonocyte': 'promonocyte',
     'Plasma Cell': 'plasmaCell',
-    'Abnormal Lymphocyte': 'abnormalLymphocyte'
+    'Abnormal Lymphocyte': 'abnormalLymphocyte',
+    'Lymphocyte': 'lymphocyte',
+    'Monocyte': 'monocyte',
+    'Eosinophil': 'eosinophil',
+    'Basophil': 'basophil'
   };
   var COMMON_TYPES = ['Segmented Neutrophil', 'Band', 'Lymphocyte', 'Monocyte', 'Eosinophil', 'Basophil', 'Giant PLT', 'NRBC', 'Smudge Cell'];
   var ABNORMAL_TYPES = ['Blast', 'Promyelocyte', 'Myelocyte', 'Metamyelocyte', 'Hypersegmented', 'Promonocyte', 'Plasma Cell', 'Abnormal Lymphocyte', 'Megakaryocyte'];
@@ -58,6 +62,55 @@
   var lastClickedCategory = null;
   var zoomLevel = 100;
   var rightMouseHeld = false;
+  /** 單手模式（右鍵長按）內左鍵次數：奇數＝錨點單選，偶數＝同區塊範圍選或跨區塊僅移錨點 */
+  var oneHandLmbCount = 0;
+  /** 唯讀：數位閱片已完成或 URL ?readonly=1（仍可縮放／瀏覽，不可改分類／核發） */
+  var readOnlyMode = false;
+
+  function getReadonlyFromUrl() {
+    try {
+      return new URLSearchParams(window.location.search).get('readonly') === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function computeReadOnlyMode(spec) {
+    if (!spec) return !!getReadonlyFromUrl();
+    if (getReadonlyFromUrl()) return true;
+    if (spec.locked) return true;
+    var hasDR = (spec.status || []).indexOf('Digital Review') >= 0;
+    if (!hasDR) return false;
+    return typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(spec);
+  }
+
+  function applyReadOnlyChrome() {
+    if (!readOnlyMode) return;
+    var banner = document.getElementById('image-review-readonly-banner');
+    if (banner) {
+      banner.classList.remove('hidden');
+      if (currentSpecimen && currentSpecimen.locked) {
+        banner.textContent = '此檢體已鎖定（他人編輯中），僅能檢視影像與縮放，無法變更細胞分類或核發報告。';
+      } else {
+        banner.textContent = '唯讀模式：數位閱片已完成，僅能檢視影像與縮放，無法變更細胞分類或核發報告。';
+      }
+    }
+    var saveBtn = document.getElementById('btn-save-report');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.setAttribute('aria-disabled', 'true');
+      saveBtn.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+      saveBtn.title = currentSpecimen && currentSpecimen.locked ? '檢體已鎖定' : '數位閱片已完成';
+    }
+    var addFlag = document.getElementById('sidebar-add-flag');
+    if (addFlag) {
+      addFlag.classList.add('opacity-50', 'pointer-events-none');
+      addFlag.title = '唯讀模式無法變更狀態標記';
+    }
+    document.querySelectorAll('#sidebar-status-tags [data-status] .material-symbols-outlined').forEach(function (ic) {
+      ic.classList.add('hidden');
+    });
+  }
 
   function getDigitalReviewList() {
     if (typeof APP_DATABASE === 'undefined' || !APP_DATABASE.specimens) return [];
@@ -158,17 +211,23 @@
     return list;
   }
 
-  function isLeaveConditionReachedByCurrentCells(category, count, pct) {
+  function isLeaveConditionReachedByCurrentCells(category, count, pct, prevReport) {
     var metricKey = CATEGORY_TO_METRIC_KEY[category];
     if (!metricKey) return false;
     var threshold = typeof LEAVE_THRESHOLDS !== 'undefined' ? LEAVE_THRESHOLDS[metricKey] : undefined;
     if (threshold == null) return false;
+    var currentValue = threshold === 'present' ? count : pct;
+    var prevValue = prevReport && prevReport[metricKey] != null ? prevReport[metricKey] : null;
+    if (typeof isNewLeaveConditionByKey === 'function') {
+      return isNewLeaveConditionByKey(metricKey, currentValue, prevValue);
+    }
+    // fallback：若共用函式不可用，退回原先「只看本次是否達標」。
     if (threshold === 'present') return count > 0;
     if (typeof threshold === 'number') return pct >= threshold;
     return false;
   }
 
-  function getSortedCategoryOrder(byCat, totalCount) {
+  function getSortedCategoryOrder(byCat, totalCount, prevReport) {
     var defaultOrder = DEFAULT_CATEGORY_ORDER.slice();
     Object.keys(byCat).forEach(function (t) {
       if (defaultOrder.indexOf(t) < 0) defaultOrder.push(t);
@@ -178,11 +237,10 @@
       if (!byCat[cat]) return false;
       var count = byCat[cat].length;
       var pct = totalCount > 0 ? (count / totalCount * 100) : 0;
-      return isLeaveConditionReachedByCurrentCells(cat, count, pct);
+      return isLeaveConditionReachedByCurrentCells(cat, count, pct, prevReport);
     });
 
-    // 一種留單：該異常置頂；兩種(含以上)留單：所有命中異常置頂。
-    // 置頂後其餘項目保留 defaultOrder 的相對順序，避免排序衝突。
+    // 所有命中留單門檻的類別都置頂；其餘項目保留 defaultOrder 的相對順序。
     if (leaveHitCategories.length === 0) return defaultOrder;
     var prioritized = leaveHitCategories;
     var rest = defaultOrder.filter(function (cat) { return prioritized.indexOf(cat) < 0; });
@@ -458,32 +516,31 @@
       byCat[c.category].push(c);
     });
 
-    var catOrder = getSortedCategoryOrder(byCat, total);
+    var prevReport = (currentSpecimen && currentSpecimen.prevReport) ? currentSpecimen.prevReport : {};
+    var catOrder = getSortedCategoryOrder(byCat, total, prevReport);
 
-    var thresholdPct = { Blast: 0, Promyelocyte: 0, Myelocyte: 5, Metamyelocyte: 10 };
     var html = '';
     catOrder.forEach(function (catName) {
       var cells = byCat[catName];
       if (!cells || cells.length === 0) return;
       var count = cells.length;
-      var pct = total ? Math.round((count / total) * 100) : 0;
-      var isAbnormal = ABNORMAL_ORDER.indexOf(catName) >= 0;
-      var overThreshold = false;
-      if (isAbnormal && thresholdPct[catName] !== undefined) overThreshold = thresholdPct[catName] === 0 ? count > 0 : pct >= thresholdPct[catName];
-      var sectionClass = isAbnormal ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-300';
-      var titleClass = overThreshold ? 'text-red-800' : (isAbnormal ? 'text-red-800' : 'text-gray-800');
-      var subClass = overThreshold ? 'text-red-600' : (isAbnormal ? 'text-red-600/70' : 'text-gray-600');
+      var pctRaw = total ? (count / total * 100) : 0;
+      var pct = total ? Math.round(pctRaw) : 0;
+      var leaveHit = isLeaveConditionReachedByCurrentCells(catName, count, pctRaw, prevReport);
+      var sectionClass = leaveHit ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-300';
+      var titleClass = leaveHit ? 'text-red-800' : 'text-gray-800';
+      var subClass = leaveHit ? 'text-red-600' : 'text-gray-600';
       html += '<div class="group section-card ' + sectionClass + ' rounded-xl overflow-hidden" data-category="' + catName + '">';
       html += '<div class="flex items-center justify-between p-4 cursor-pointer hover:opacity-90 transition-colors section-header" onclick="window.imageReviewToggleGrid(this)">';
       html += '<div class="flex items-center gap-3">';
-      if (isAbnormal) html += '<span class="material-symbols-outlined text-red-500 font-bold">warning</span>';
+      if (leaveHit) html += '<span class="material-symbols-outlined text-red-500 font-bold">warning</span>';
       html += '<div class="flex items-baseline gap-2"><h2 class="text-lg font-bold ' + titleClass + '">' + catName + '</h2><span class="text-sm font-medium ' + subClass + ' section-count">(' + count + ' Cells, ' + pct + '%)</span></div></div>';
       html += '<span class="toggle-icon material-symbols-outlined text-gray-400 transition-transform duration-200 icon-rotate-180">expand_more</span></div>';
       html += '<div class="grid-content px-4 pb-4 grid-expanded transition-all duration-300 section-content">';
       html += '<div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-16 gap-2 mt-2 cell-grid" data-category="' + catName + '">';
       cells.forEach(function (cell) {
         var sel = selectedCellIds.has(cell.id) ? ' ring-2 ring-primary' : '';
-        html += '<div class="cell-image-container relative aspect-square cursor-pointer transition-all rounded-lg border-2 border-gray-300' + sel + '" data-cell-id="' + cell.id + '" data-category="' + catName + '" draggable="true"><img alt="Cell" class="w-full h-full object-cover rounded-lg" src="' + (cell.imageUrl || '') + '"/></div>';
+        html += '<div class="cell-image-container relative aspect-square cursor-pointer transition-all rounded-lg border-2 border-gray-300' + sel + '" data-cell-id="' + cell.id + '" data-category="' + catName + '" draggable="' + (readOnlyMode ? 'false' : 'true') + '"><img alt="Cell" class="w-full h-full object-cover rounded-lg" src="' + (cell.imageUrl || '') + '"/></div>';
       });
       html += '</div></div></div>';
     });
@@ -498,13 +555,27 @@
     containers.forEach(function (el) {
       var cellId = el.getAttribute('data-cell-id');
       el.addEventListener('click', function (e) {
-        if (rightMouseHeld) { toggleSelect(cellId); return; }
+        if (rightMouseHeld) {
+          oneHandLmbCount++;
+          if (oneHandLmbCount % 2 === 1) {
+            singleSelect(cellId);
+          } else {
+            var ohInfo = getCategoryListAndIndex(cellId);
+            if (lastClickedCategory === ohInfo.category) {
+              rangeSelect(cellId);
+            } else {
+              singleSelect(cellId);
+            }
+          }
+          return;
+        }
         if (e.ctrlKey) { toggleSelect(cellId); return; }
         if (e.shiftKey) { rangeSelect(cellId); return; }
         singleSelect(cellId);
       });
       el.addEventListener('contextmenu', function (e) {
         e.preventDefault();
+        if (readOnlyMode) return;
         // 若已有多選 (單手模式或 Ctrl/Shift)，維持目前選取集合
         if (selectedCellIds.size === 0) {
           singleSelect(cellId);
@@ -515,6 +586,10 @@
         showContextMenu(e, firstId);
       });
       el.addEventListener('dragstart', function (e) {
+        if (readOnlyMode) {
+          e.preventDefault();
+          return;
+        }
         if (!selectedCellIds.has(cellId)) selectedCellIds.clear(); selectedCellIds.add(cellId);
         e.dataTransfer.setData('text/plain', JSON.stringify(Array.from(selectedCellIds)));
         e.dataTransfer.effectAllowed = 'move';
@@ -522,6 +597,7 @@
       el.addEventListener('dragover', function (e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
       el.addEventListener('drop', function (e) {
         e.preventDefault();
+        if (readOnlyMode) return;
         var cat = el.getAttribute('data-category');
         if (cat) moveSelectedToCategory(cat);
       });
@@ -537,6 +613,7 @@
         content.addEventListener('drop', function (e) {
           e.preventDefault();
           e.currentTarget.classList.remove('bg-primary/5');
+          if (readOnlyMode) return;
           if (cat) moveSelectedToCategory(cat);
         });
       }
@@ -665,6 +742,7 @@
   }
 
   function moveSelectedToCategory(category) {
+    if (readOnlyMode) return;
     var ids = Array.from(selectedCellIds);
     ids.forEach(function (id) {
       var cell = cellData.find(function (c) { return c.id === id; });
@@ -677,6 +755,10 @@
   var aiLabelToCategory = { 'Segmented': 'Segmented Neutrophil', 'Lym': 'Lymphocyte', 'Mono': 'Monocyte', 'Eo': 'Eosinophil', 'Baso': 'Basophil', 'Band': 'Band', 'Blast': 'Blast', 'Promyelocyte': 'Promyelocyte', 'Myelocyte': 'Myelocyte' };
 
   function showContextMenu(e, cellId) {
+    if (readOnlyMode) {
+      e.preventDefault();
+      return;
+    }
     var menu = document.getElementById('context-menu');
     if (!menu) return;
     var cell = cellData.find(function (c) { return c.id === cellId; });
@@ -698,18 +780,26 @@
       } else aiBlock.style.display = 'none';
     }
 
+    // 先顯示再量測，避免內容動態變化（如 AI 區塊）造成邊界計算失真。
+    menu.style.display = 'flex';
+    menu.style.visibility = 'hidden';
+
     var rect = menu.getBoundingClientRect();
     var x = e.clientX;
     var y = e.clientY;
     var w = window.innerWidth;
     var h = window.innerHeight;
-    if (x + rect.width > w) x = w - rect.width - 10;
-    if (y + rect.height > h) y = h - rect.height - 10;
-    if (x < 0) x = 10;
-    if (y < 0) y = 10;
+    var pad = 8;
+    var maxX = Math.max(pad, w - rect.width - pad);
+    var maxY = Math.max(pad, h - rect.height - pad);
+    if (x > maxX) x = maxX;
+    if (y > maxY) y = maxY;
+    if (x < pad) x = pad;
+    if (y < pad) y = pad;
+
     menu.style.left = x + 'px';
     menu.style.top = y + 'px';
-    menu.style.display = 'flex';
+    menu.style.visibility = 'visible';
   }
 
   function hideContextMenu() {
@@ -718,6 +808,7 @@
   }
 
   function onSaveReport() {
+    if (readOnlyMode) return;
     var total = getTotalCells();
     var unidentified = getUnidentifiedCount();
     var progress = total ? Math.round(((total - unidentified) / total) * 100) : 100;
@@ -777,11 +868,14 @@
       currentSpecimen = APP_DATABASE.specimens.find(function (s) { return s.id === currentSpecimenId; }) || APP_DATABASE.specimens[0];
     }
 
+    readOnlyMode = computeReadOnlyMode(currentSpecimen);
+
     digitalReviewList = getDigitalReviewList();
     cellData = getOrCreateCellData(currentSpecimenId);
 
     renderSidebar();
     renderCellGroups();
+    applyReadOnlyChrome();
 
     var ctxMenu = document.getElementById('context-menu');
     document.addEventListener('click', function (e) {
@@ -793,11 +887,13 @@
       if (e.button === 2) {
         // 進入單手模式，不清除既有選取，讓 Shift / Ctrl 多選後仍可直接用右鍵開單一選單
         rightMouseHeld = true;
+        oneHandLmbCount = 0;
       }
     });
     document.addEventListener('mouseup', function (e) {
       if (e.button === 2) {
         rightMouseHeld = false;
+        oneHandLmbCount = 0;
       }
     });
 
@@ -863,6 +959,23 @@
         if (cancelModal) cancelModal.classList.add('hidden');
         return;
       }
+      if (data.type === 'reportManualAlert') {
+        var manualAlertId = data.specimenId || currentSpecimenId;
+        if (typeof applySpecimenStatusOverridesFromStorage === 'function') {
+          applySpecimenStatusOverridesFromStorage();
+        }
+        if (manualAlertId && currentSpecimen && currentSpecimen.id === manualAlertId) {
+          var refreshed = typeof getSpecimenById === 'function' ? getSpecimenById(manualAlertId) : null;
+          if (refreshed) currentSpecimen = refreshed;
+          digitalReviewList = getDigitalReviewList();
+          renderSidebar();
+        }
+        var manualModal = document.getElementById('report-issue-modal');
+        if (manualModal) manualModal.classList.add('hidden');
+        if (typeof queueManualAlertToast === 'function') queueManualAlertToast(manualAlertId);
+        if (typeof window.goToSpecimenList === 'function') window.goToSpecimenList();
+        return;
+      }
       if (data.type !== 'reportVerified') return;
       var id = data.specimenId || currentSpecimenId;
       if (!id || typeof APP_DATABASE === 'undefined' || !APP_DATABASE.specimens) return;
@@ -875,26 +988,37 @@
       if (typeof spec.workflowDone.entityReview !== 'boolean') {
         spec.workflowDone.entityReview = (typeof hasAnyEntityReviewTask === 'function') ? !hasAnyEntityReviewTask(spec) : false;
       }
-      spec.statusDone = !!(spec.workflowDone.digitalReview && spec.workflowDone.entityReview);
       if (Array.isArray(spec.status)) {
         spec.status = spec.status.filter(function (x) { return x !== 'Verified'; });
       }
+      spec.statusDone = typeof computeSpecimenStatusDoneFromWorkflow === 'function'
+        ? computeSpecimenStatusDoneFromWorkflow(spec.status, spec.workflowDone)
+        : !!(spec.workflowDone.digitalReview && spec.workflowDone.entityReview);
       var editorAccount = typeof getCurrentUserAccount === 'function' ? getCurrentUserAccount() : '';
-      if (editorAccount) spec.editor = editorAccount;
+      if (!spec.statusDone) spec.editor = '';
+      else if (editorAccount) spec.editor = editorAccount;
       if (typeof window.persistSpecimenStatusOverride === 'function') {
-        window.persistSpecimenStatusOverride(id, spec.status, { workflowDone: spec.workflowDone, editor: editorAccount });
+        window.persistSpecimenStatusOverride(id, spec.status, { workflowDone: spec.workflowDone, editor: spec.statusDone ? editorAccount : '' });
       }
       notifyReportIframeToRefresh();
       if (currentSpecimen && currentSpecimen.id === id) {
         currentSpecimen.status = spec.status.slice();
-        currentSpecimen.workflowDone = { digitalReview: !!spec.workflowDone.digitalReview, entityReview: !!spec.workflowDone.entityReview };
-        currentSpecimen.statusDone = !!(currentSpecimen.workflowDone.digitalReview && currentSpecimen.workflowDone.entityReview);
-        if (editorAccount) currentSpecimen.editor = editorAccount;
+        currentSpecimen.workflowDone = spec.workflowDone;
+        currentSpecimen.statusDone = spec.statusDone;
+        if (!currentSpecimen.statusDone) currentSpecimen.editor = '';
+        else if (editorAccount) currentSpecimen.editor = editorAccount;
         digitalReviewList = getDigitalReviewList();
         renderSidebar();
       }
       var reportModal = document.getElementById('report-issue-modal');
       if (reportModal) reportModal.classList.add('hidden');
+      if (data.navigateNextDigitalReview) {
+        var nextPending = digitalReviewList && digitalReviewList.length > 0 ? digitalReviewList[0] : null;
+        if (nextPending && nextPending.id) {
+          goToSpecimen(nextPending.id);
+          return;
+        }
+      }
       if (typeof window.goToSpecimenList === 'function') window.goToSpecimenList();
     });
   }

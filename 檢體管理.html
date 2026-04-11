@@ -221,9 +221,20 @@
     </div>
   </div>
 
+  <div id="specimen-list-toast" class="fixed bottom-6 left-1/2 z-[200] max-w-[min(90vw,28rem)] -translate-x-1/2 hidden" role="status" aria-live="polite">
+    <div class="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg text-sm text-amber-950">
+      <span class="material-symbols-outlined text-amber-600 shrink-0 text-xl">info</span>
+      <span id="specimen-list-toast-text"></span>
+    </div>
+  </div>
+
+  <div id="specimen-list-context-menu" class="hidden fixed z-[300] min-w-[220px] py-1 bg-surface-light border border-border-light rounded-lg shadow-xl text-sm" role="menu" aria-hidden="true">
+    <button type="button" id="specimen-ctx-reopen-dr" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-text-light text-xs font-medium">退回 Digital Review</button>
+  </div>
+
   <script src="assets/data/database.js?v=20260411b"></script>
-  <script src="assets/js/common.js?v=20260411b"></script>
-  <script src="assets/js/tutorial.js"></script>
+  <script src="assets/js/common.js?v=20260411d"></script>
+  <script src="assets/js/tutorial.js?v=20260411e"></script>
   <script>
     (function () {
       var currentSpecimenId = null;
@@ -512,12 +523,16 @@
           var tr = document.createElement('tr');
           tr.className = 'hover:bg-gray-50 ' + rowClass(s, i);
           tr.dataset.specimenId = s.id;
-          var enterDisabled = s.locked ? ' disabled' : '';
+          var stList = s.status || [];
+          var drCompleted = !s.locked && stList.indexOf('Digital Review') >= 0 && typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(s);
+          var enterDisabled = (s.locked || drCompleted) ? ' disabled' : '';
           var enterText = s.locked ? '已鎖定' : '進入閱片';
+          var enterTitle = drCompleted ? ' title="數位閱片已完成"' : '';
+          var extraReadonly = drCompleted ? '<button type="button" class="readonly-review-btn text-amber-800 text-xs font-semibold hover:underline whitespace-nowrap" data-id="' + s.id + '">唯讀檢視</button>' : '';
           tr.innerHTML =
             '<td class="p-2 py-4"><input type="checkbox" class="row-check rounded border-gray-300 text-primary focus:ring-primary" data-id="' + s.id + '"/></td>' +
             '<td class="p-2 py-4"><div class="flex flex-col gap-1 items-start">' + renderStatus(s) + '</div></td>' +
-            '<td class="p-2 py-4">' + (s.urgency != null ? s.urgency : '') + '</td>' +
+            '<td class="p-2 py-4">' + (typeof getSpecimenDisplayUrgency === 'function' ? getSpecimenDisplayUrgency(s) : (s.urgency != null ? s.urgency : '')) + '</td>' +
             '<td class="p-2 py-4">' + s.id + '</td>' +
             '<td class="p-2 py-4">' + s.patientId + '</td>' +
             '<td class="p-2 py-4">' + s.name + '</td>' +
@@ -526,7 +541,10 @@
             '<td class="p-2 py-4">' + s.location + '</td>' +
             '<td class="p-2 py-4">' + s.analysisTime + '</td>' +
             '<td class="p-2 py-4">' + (s.editor || '') + '</td>' +
-            '<td class="p-2 py-4"><button type="button" class="text-primary text-xs hover:underline enter-review-btn" data-id="' + s.id + '"' + enterDisabled + '>' + enterText + '</button></td>';
+            '<td class="p-2 py-4"><div class="flex flex-wrap items-center gap-2">' +
+            '<button type="button" class="text-primary text-xs hover:underline enter-review-btn' + (drCompleted ? ' opacity-50 cursor-not-allowed' : '') + '" data-id="' + s.id + '"' + enterDisabled + enterTitle + '>' + enterText + '</button>' +
+            extraReadonly +
+            '</div></td>';
           tbody.appendChild(tr);
         });
 
@@ -540,7 +558,11 @@
             if (e.target.type === 'checkbox') return;
             var id = tr.dataset.specimenId;
             var spec = getSpecimenById(id);
-            if (id && spec && !spec.locked) goToImageReview(id);
+            if (!id || !spec || spec.locked) return;
+            var st = spec.status || [];
+            var drDone = st.indexOf('Digital Review') >= 0 && typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(spec);
+            if (drDone) return;
+            goToImageReview(id);
           });
         });
         tbody.querySelectorAll('.enter-review-btn:not([disabled])').forEach(function (btn) {
@@ -548,6 +570,13 @@
             e.stopPropagation();
             var id = btn.dataset.id;
             if (id) goToImageReview(id);
+          });
+        });
+        tbody.querySelectorAll('.readonly-review-btn').forEach(function (btn) {
+          btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var id = btn.dataset.id;
+            if (id && typeof goToImageReview === 'function') goToImageReview(id, { readonly: true });
           });
         });
         document.getElementById('footer-status').textContent = '已篩選 ' + filteredList.length + ' 筆';
@@ -561,6 +590,7 @@
           var specimenId = tr ? tr.getAttribute('data-specimen-id') : '';
           var specimen = specimenId ? getSpecimenById(specimenId) : null;
           if (!specimen || !statusKey) return;
+          if (specimen.locked) return;
           if (statusKey !== 'PLT Check' && statusKey !== 'Follow-up' && statusKey !== 'AI Alert' && statusKey !== 'Manual Alert') return;
           if (!specimen.workflowDone || typeof specimen.workflowDone !== 'object') {
             specimen.workflowDone = { digitalReview: false, entityReview: false, entityStatusDone: {} };
@@ -568,6 +598,7 @@
           if (!specimen.workflowDone.entityStatusDone || typeof specimen.workflowDone.entityStatusDone !== 'object') {
             specimen.workflowDone.entityStatusDone = {};
           }
+          var beforeComplete = typeof isSpecimenWorkflowCompleted === 'function' ? isSpecimenWorkflowCompleted(specimen) : false;
           var current = !!specimen.workflowDone.entityStatusDone[statusKey];
           specimen.workflowDone.entityStatusDone[statusKey] = !current;
           var st = specimen.status || [];
@@ -578,6 +609,12 @@
             return !!specimen.workflowDone.entityStatusDone[x];
           });
           specimen.statusDone = typeof isSpecimenWorkflowCompleted === 'function' ? isSpecimenWorkflowCompleted(specimen) : false;
+          var afterComplete = !!specimen.statusDone;
+          if (!afterComplete) specimen.editor = '';
+          else if (afterComplete && !beforeComplete) {
+            var editorAccount = typeof getCurrentUserAccount === 'function' ? getCurrentUserAccount() : '';
+            if (editorAccount) specimen.editor = editorAccount;
+          }
           if (typeof persistSpecimenStatusOverride === 'function') {
             persistSpecimenStatusOverride(specimen.id, specimen.status, { workflowDone: specimen.workflowDone, editor: specimen.editor || '' });
           }
@@ -592,6 +629,87 @@
           e.stopPropagation();
         }
       });
+
+      var ctxMenuSpecimenId = null;
+
+      function hideSpecimenRowContextMenu() {
+        var menu = document.getElementById('specimen-list-context-menu');
+        if (menu) {
+          menu.classList.add('hidden');
+          menu.style.display = '';
+          menu.style.visibility = '';
+          menu.setAttribute('aria-hidden', 'true');
+        }
+        ctxMenuSpecimenId = null;
+      }
+
+      function showSpecimenRowContextMenu(e, specimenId) {
+        var menu = document.getElementById('specimen-list-context-menu');
+        if (!menu) return;
+        ctxMenuSpecimenId = specimenId;
+        menu.classList.remove('hidden');
+        menu.style.display = 'block';
+        menu.style.visibility = 'hidden';
+        var rect = menu.getBoundingClientRect();
+        var pad = 8;
+        var x = e.clientX;
+        var y = e.clientY;
+        var mw = window.innerWidth;
+        var mh = window.innerHeight;
+        var maxX = Math.max(pad, mw - rect.width - pad);
+        var maxY = Math.max(pad, mh - rect.height - pad);
+        if (x > maxX) x = maxX;
+        if (y > maxY) y = maxY;
+        if (x < pad) x = pad;
+        if (y < pad) y = pad;
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+        menu.style.visibility = 'visible';
+        menu.setAttribute('aria-hidden', 'false');
+      }
+
+      var specimenTbodyEl = document.getElementById('specimen-tbody');
+      if (specimenTbodyEl) {
+        specimenTbodyEl.addEventListener('contextmenu', function (e) {
+          var tr = e.target.closest('tr');
+          if (!tr || !tr.dataset.specimenId) return;
+          if (e.target.closest('input, button')) return;
+          var spec = typeof getSpecimenById === 'function' ? getSpecimenById(tr.dataset.specimenId) : null;
+          if (!spec || spec.locked) return;
+          var st = spec.status || [];
+          var drDone = st.indexOf('Digital Review') >= 0 && typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(spec);
+          if (!drDone) return;
+          e.preventDefault();
+          showSpecimenRowContextMenu(e, tr.dataset.specimenId);
+        });
+      }
+
+      document.addEventListener('click', function (e) {
+        if (e.target.closest && e.target.closest('#specimen-list-context-menu')) return;
+        hideSpecimenRowContextMenu();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') hideSpecimenRowContextMenu();
+      });
+
+      var btnCtxReopenDr = document.getElementById('specimen-ctx-reopen-dr');
+      if (btnCtxReopenDr) {
+        btnCtxReopenDr.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var id = ctxMenuSpecimenId;
+          hideSpecimenRowContextMenu();
+          if (!id) return;
+          if (!window.confirm('確定要將此檢體退回 Digital Review？之後可再次進入編輯。')) return;
+          if (typeof reopenDigitalReview === 'function' && reopenDigitalReview(id)) {
+            if (typeof applySpecimenStatusOverridesFromStorage === 'function') applySpecimenStatusOverridesFromStorage();
+            renderTable();
+            if (filteredList.some(function (r) { return r.id === id; })) selectRow(id);
+            else if (filteredList.length) selectRow(filteredList[0].id);
+            var fs = document.getElementById('footer-status');
+            if (fs) fs.textContent = '已退回數位閱片：' + id;
+          }
+        });
+      }
 
       function updateSortUI() {
         document.querySelectorAll('th.sortable').forEach(function (th) {
@@ -871,7 +989,22 @@
       updateSortUI();
       renderTable();
       persistSpecimenListUiState();
-      if (filteredList.length) selectRow(filteredList[0].id);
+
+      var manualAlertToastId = typeof consumeManualAlertToastQueue === 'function' ? consumeManualAlertToastQueue() : null;
+      if (manualAlertToastId) {
+        var toastEl = document.getElementById('specimen-list-toast');
+        var toastText = document.getElementById('specimen-list-toast-text');
+        if (toastEl && toastText) {
+          toastText.textContent = manualAlertToastId + ' 已歸入 Manual Alert，等待人工鏡檢';
+          toastEl.classList.remove('hidden');
+          setTimeout(function () { toastEl.classList.add('hidden'); }, 6000);
+        }
+      }
+      if (manualAlertToastId && filteredList.some(function (r) { return r.id === manualAlertToastId; })) {
+        selectRow(manualAlertToastId);
+      } else if (filteredList.length) {
+        selectRow(filteredList[0].id);
+      }
 
       if (window.Tutorial) {
         Tutorial.runOnSpecimenPage();

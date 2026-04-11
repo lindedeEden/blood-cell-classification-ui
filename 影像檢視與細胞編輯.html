@@ -78,6 +78,8 @@
             position: fixed;
             z-index: 1000;
             transform-origin: top left;
+            max-height: calc(100vh - 16px);
+            overflow-y: auto;
         }
         .menu-item {
             @apply flex items-center justify-center h-9 text-[11px] font-semibold rounded border border-gray-300 bg-white text-gray-700 hover:bg-primary/5 hover:border-primary hover:text-primary transition-all active:scale-[0.98] shadow-sm leading-tight;
@@ -230,6 +232,9 @@
                 </button>
 </div>
 </header>
+<div id="image-review-readonly-banner" class="hidden shrink-0 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-950 text-sm font-medium text-center" role="status">
+        唯讀模式：數位閱片已完成，僅能檢視影像與縮放，無法變更細胞分類或核發報告。
+    </div>
 <div class="flex-1 min-h-0 overflow-y-auto p-6 scroll-smooth overscroll-contain">
 <div class="w-full min-w-0 space-y-6" id="main-cell-groups">
   <!-- 初始不放任何靜態細胞卡片，全部由 image-review.js 動態產生 -->
@@ -308,9 +313,9 @@
 </div>
 </div>
 <script src="assets/data/database.js?v=20260411b"></script>
-<script src="assets/js/common.js?v=20260411b"></script>
-<script src="assets/js/tutorial.js"></script>
-<script src="assets/js/image-review.js?v=20260411b"></script>
+<script src="assets/js/common.js?v=20260411d"></script>
+<script src="assets/js/tutorial.js?v=20260411e"></script>
+<script src="assets/js/image-review.js?v=20260411d"></script>
 <script>
     function toggleGrid(headerEl) {
       var card = headerEl && headerEl.closest ? headerEl.closest('.group') : (headerEl && headerEl.parentElement);
