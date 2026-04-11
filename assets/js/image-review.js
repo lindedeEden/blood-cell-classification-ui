@@ -66,6 +66,9 @@
   var oneHandLmbCount = 0;
   /** 唯讀：數位閱片已完成或 URL ?readonly=1（仍可縮放／瀏覽，不可改分類／核發） */
   var readOnlyMode = false;
+  /** 主內容區捲動時，細胞縮圖曾進入視野者（data-cell-id）；換檢體時清空 */
+  var viewedCellIds = new Set();
+  var cellViewObserver = null;
 
   function getReadonlyFromUrl() {
     try {
@@ -491,18 +494,57 @@
   function getViewedProgress() {
     var total = getTotalCells();
     if (total === 0) return 100;
-    var unidentified = getUnidentifiedCount();
-    return Math.round(((total - unidentified) / total) * 100);
+    return Math.round((viewedCellIds.size / total) * 100);
+  }
+
+  function disconnectCellViewObserver() {
+    if (cellViewObserver) {
+      cellViewObserver.disconnect();
+      cellViewObserver = null;
+    }
+  }
+
+  /** root 為 #main-cell-groups 之父層（main 內 overflow-y-auto 捲動容器） */
+  function setupCellViewObserver() {
+    disconnectCellViewObserver();
+    var groupsEl = document.getElementById('main-cell-groups');
+    if (!groupsEl) return;
+    var scrollRoot = groupsEl.parentElement;
+    if (!scrollRoot) return;
+    var cells = groupsEl.querySelectorAll('.cell-image-container');
+    if (!cells.length) {
+      updateProgressBar();
+      return;
+    }
+    cellViewObserver = new IntersectionObserver(function (entries) {
+      var changed = false;
+      entries.forEach(function (ent) {
+        if (!ent.isIntersecting || ent.intersectionRatio < 0.35) return;
+        var id = ent.target.getAttribute('data-cell-id');
+        if (id && !viewedCellIds.has(id)) {
+          viewedCellIds.add(id);
+          changed = true;
+        }
+      });
+      if (changed) updateProgressBar();
+    }, { root: scrollRoot, rootMargin: '0px', threshold: [0, 0.25, 0.5, 0.75, 1] });
+    for (var i = 0; i < cells.length; i++) {
+      cellViewObserver.observe(cells[i]);
+    }
+    updateProgressBar();
   }
 
   function updateProgressBar() {
     var total = getTotalCells();
+    var viewed = viewedCellIds.size;
     var unidentified = getUnidentifiedCount();
-    var viewed = total - unidentified;
     var textEl = document.getElementById('toolbar-progress-text');
     var barEl = document.getElementById('toolbar-progress-bar');
-    if (textEl) textEl.textContent = (viewed + ' / ' + total + ' Cells');
-    if (barEl) barEl.style.width = (total ? ((viewed / total) * 100) : 100) + '%';
+    if (textEl) {
+      textEl.textContent = '已檢視 ' + viewed + ' / ' + total + ' · Unidentified ' + unidentified;
+    }
+    var pct = total ? (viewed / total * 100) : 100;
+    if (barEl) barEl.style.width = pct + '%';
   }
 
   function renderCellGroups() {
@@ -545,8 +587,8 @@
       html += '</div></div></div>';
     });
     container.innerHTML = html;
-    updateProgressBar();
     bindCellEvents();
+    setupCellViewObserver();
     applyZoom();
   }
 
@@ -780,20 +822,26 @@
       } else aiBlock.style.display = 'none';
     }
 
-    // 先顯示再量測，避免內容動態變化（如 AI 區塊）造成邊界計算失真。
-    menu.style.display = 'flex';
-    menu.style.visibility = 'hidden';
-
-    var rect = menu.getBoundingClientRect();
-    var x = e.clientX;
-    var y = e.clientY;
+    // 先顯示再量測；先套用視窗高度上限，避免量到未收合的完整內容高度而導致底部超出畫面。
     var w = window.innerWidth;
     var h = window.innerHeight;
     var pad = 8;
-    var maxX = Math.max(pad, w - rect.width - pad);
-    var maxY = Math.max(pad, h - rect.height - pad);
-    if (x > maxX) x = maxX;
-    if (y > maxY) y = maxY;
+    var maxAvailH = Math.max(120, h - 2 * pad);
+    menu.style.display = 'flex';
+    menu.style.flexDirection = 'column';
+    menu.style.visibility = 'hidden';
+    menu.style.maxHeight = maxAvailH + 'px';
+    menu.style.overflowY = 'auto';
+    menu.style.boxSizing = 'border-box';
+    void menu.offsetHeight;
+
+    var rect = menu.getBoundingClientRect();
+    var mw = rect.width;
+    var mh = rect.height;
+    var x = e.clientX;
+    var y = e.clientY;
+    if (x + mw > w - pad) x = w - pad - mw;
+    if (y + mh > h - pad) y = h - pad - mh;
     if (x < pad) x = pad;
     if (y < pad) y = pad;
 
@@ -804,18 +852,33 @@
 
   function hideContextMenu() {
     var menu = document.getElementById('context-menu');
-    if (menu) menu.style.display = 'none';
+    if (!menu) return;
+    menu.style.display = 'none';
+    menu.style.maxHeight = '';
+    menu.style.overflowY = '';
+    menu.style.boxSizing = '';
   }
 
   function onSaveReport() {
     if (readOnlyMode) return;
     var total = getTotalCells();
     var unidentified = getUnidentifiedCount();
-    var progress = total ? Math.round(((total - unidentified) / total) * 100) : 100;
-    if (unidentified > 0 || progress < 100) {
+    var viewed = viewedCellIds.size;
+    if (total === 0) {
+      var modalEmpty = document.getElementById('modal-save-block');
+      if (modalEmpty) {
+        modalEmpty.querySelector('.modal-message').textContent = '尚無細胞資料，無法儲存。';
+        modalEmpty.classList.remove('hidden');
+      }
+      return;
+    }
+    if (unidentified > 0 || viewed < total) {
       var modal = document.getElementById('modal-save-block');
       if (modal) {
-        modal.querySelector('.modal-message').textContent = unidentified > 0 ? '尚有未分類細胞 (Unidentified: ' + unidentified + ')，請完成分類後再儲存。' : '尚未檢視完成 (進度 ' + progress + '%)，請完成後再儲存。';
+        var parts = [];
+        if (viewed < total) parts.push('尚有 ' + (total - viewed) + ' 張細胞未檢視（請於主內容區捲動，使所有細胞曾進入視野）。');
+        if (unidentified > 0) parts.push('尚有 Unidentified 未分類細胞（' + unidentified + '）。');
+        modal.querySelector('.modal-message').textContent = parts.join(' ');
         modal.classList.remove('hidden');
       }
       return;
@@ -871,6 +934,8 @@
     readOnlyMode = computeReadOnlyMode(currentSpecimen);
 
     digitalReviewList = getDigitalReviewList();
+    viewedCellIds.clear();
+    disconnectCellViewObserver();
     cellData = getOrCreateCellData(currentSpecimenId);
 
     renderSidebar();

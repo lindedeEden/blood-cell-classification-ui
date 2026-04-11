@@ -88,7 +88,7 @@
     {
       selector: '#tutorial-image-tr',
       title: '右上：工具列',
-      body: '<strong>檢視進度</strong>：已檢視細胞數與總細胞數。<br/><strong>縮放</strong>：50%～200%。<br/><strong>儲存並核發報告</strong>：唯讀模式下無法使用。若尚有 Unidentified 或進度未滿，會阻擋並提示；通過後開啟<strong>報告核發</strong>視窗（iframe），於其中確認資料並簽核。'
+      body: '<strong>檢視進度</strong>：主內容區捲動時，細胞縮圖進入視野即計入已檢視；進度條為已檢視／總數，並顯示 Unidentified 數量。<br/><strong>縮放</strong>：50%～200%。<br/><strong>儲存並核發報告</strong>：唯讀模式下無法使用。須<strong>全部細胞已檢視</strong>且<strong>無 Unidentified</strong>才可儲存；未達條件會阻擋並提示；通過後開啟<strong>報告核發</strong>視窗（iframe），於其中確認資料並簽核。'
     },
     {
       selector: '#main-cell-groups',
