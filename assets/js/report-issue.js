@@ -150,17 +150,46 @@
     };
   }
 
-  function addManualAlertFromReport(spec) {
-    if (!spec || !spec.id) return;
+  function specimenHasAiAlert(spec) {
+    if (!spec || !Array.isArray(spec.status)) return false;
+    return spec.status.indexOf('AI Alert') !== -1;
+  }
+
+  function isAiAlertPendingConfirmation(spec) {
+    if (!specimenHasAiAlert(spec)) return false;
+    if (typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(spec, 'AI Alert')) return false;
+    return true;
+  }
+
+  function shouldShowManualReviewFromReportBtn(spec) {
+    if (!isAiAlertPendingConfirmation(spec)) return false;
+    var effective = getEffectiveMetricsForRisk(spec);
+    var risk = getRiskState(spec, effective);
+    /** 綠色／黃色（人員編輯後未達留單）：誤報排除，不需「改為人工鏡檢」 */
+    return !!risk.hasNewLeave;
+  }
+
+  function addFollowUpForManualReviewFromReport(spec) {
+    if (!spec || !spec.id) return { addedFollowUp: false };
     if (!Array.isArray(spec.status)) spec.status = [];
+    var hadFollowUp = spec.status.indexOf('Follow-up') !== -1;
     var st = spec.status.slice();
     st = st.filter(function (s) { return s !== 'Digital Review'; });
-    if (st.indexOf('Manual Alert') === -1) st.push('Manual Alert');
+    if (!hadFollowUp && st.indexOf('Follow-up') === -1) st.push('Follow-up');
+    if (typeof migrateLegacyManualAlertStatus === 'function') {
+      st = migrateLegacyManualAlertStatus(st);
+    }
     spec.status = st;
     if (typeof persistSpecimenStatusOverride === 'function') {
-      persistSpecimenStatusOverride(spec.id, spec.status, { workflowDone: { entityReview: false } });
+      var workflowPatch = typeof buildWorkflowDoneAfterManualFollowUpFromReport === 'function'
+        ? buildWorkflowDoneAfterManualFollowUpFromReport(spec, st)
+        : { entityReview: false };
+      persistSpecimenStatusOverride(spec.id, spec.status, { workflowDone: workflowPatch });
+      if (spec.workflowDone && typeof workflowPatch === 'object') {
+        spec.workflowDone = workflowPatch;
+      }
     }
-    refreshReportFromParent();
+    return { addedFollowUp: !hadFollowUp };
   }
 
   function applyRiskBanner(spec) {
@@ -256,9 +285,12 @@
       var displayStatuses = statuses.filter(function (s) { return s !== 'Verified'; });
       var html = displayStatuses.map(function (s) {
         var style = 'bg-gray-100 text-gray-800';
-        var label = s;
+        var label = typeof getStatusDisplayLabel === 'function' ? getStatusDisplayLabel(s) : s;
         var prefixIcon = '';
-        if (s === 'AI Alert' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['AI Alert'] || style;
+        if (s === 'AI Alert' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(spec, 'AI Alert')) {
+          style = 'bg-green-100 text-green-800';
+          prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
+        } else if (s === 'AI Alert' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['AI Alert'] || style;
         else if (s === 'PLT Check' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['PLT Check'] || style;
         else if (s === 'Follow-up' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(spec, 'Follow-up')) {
           style = 'bg-green-100 text-green-800';
@@ -269,19 +301,64 @@
           prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
         } else if (s === 'Digital Review' && typeof STATUS_STYLES !== 'undefined') {
           style = STATUS_STYLES['Digital Review'] || style;
-        } else if (s === 'Manual Alert' && typeof STATUS_STYLES !== 'undefined') {
-          style = STATUS_STYLES['Manual Alert'] || style;
         }
         return '<span class="inline-flex items-center px-3 py-0.5 rounded-full text-[11px] font-semibold ' + style + '">' + prefixIcon + label + '</span>';
       }).join('');
       statusWrap.innerHTML = html;
     }
     var manualAlertBtn = document.getElementById('manual-alert-btn');
-    if (manualAlertBtn) manualAlertBtn.classList.toggle('hidden', !risk.hasNewLeave);
+    if (manualAlertBtn) manualAlertBtn.classList.toggle('hidden', !shouldShowManualReviewFromReportBtn(spec));
+    applyReportFooterActions(spec);
     applyRiskBanner(spec);
     buildWbcTable(spec);
     buildOtherTable(spec);
     fillCbcPanel(spec);
+  }
+
+  var verifySignOffUnlocked = false;
+  var verifyUnlockSpecimenId = null;
+
+  function applyReportFooterActions(spec) {
+    var sid = spec && spec.id ? spec.id : '';
+    if (sid !== verifyUnlockSpecimenId) {
+      verifySignOffUnlocked = false;
+      verifyUnlockSpecimenId = sid;
+    }
+    var pendingFollowUp = typeof needsPendingFollowUpReview === 'function' && needsPendingFollowUpReview(spec);
+    var signOffBlocked = pendingFollowUp && !verifySignOffUnlocked;
+    var confirmBtn = document.getElementById('confirm-btn');
+    var lockBtn = document.getElementById('verify-lock-btn');
+    var lockIcon = document.getElementById('verify-lock-icon');
+    var followUpDoneBtn = document.getElementById('follow-up-done-btn');
+    if (confirmBtn) {
+      confirmBtn.disabled = !!signOffBlocked;
+      confirmBtn.setAttribute('aria-disabled', signOffBlocked ? 'true' : 'false');
+      confirmBtn.classList.toggle('opacity-50', !!signOffBlocked);
+      confirmBtn.classList.toggle('cursor-not-allowed', !!signOffBlocked);
+      confirmBtn.classList.toggle('pointer-events-none', !!signOffBlocked);
+      confirmBtn.title = signOffBlocked ? '尚有需拉片確認未完成，請開鎖或先點「已拉片完成」' : '';
+    }
+    if (lockBtn) {
+      lockBtn.classList.toggle('hidden', !pendingFollowUp);
+      lockBtn.setAttribute('aria-hidden', pendingFollowUp ? 'false' : 'true');
+      if (pendingFollowUp) {
+        if (verifySignOffUnlocked) {
+          lockBtn.classList.remove('bg-zinc-200', 'border-zinc-300', 'text-zinc-600');
+          lockBtn.classList.add('bg-amber-50', 'border-amber-400', 'text-amber-800');
+          lockBtn.title = '已開鎖，可簽核（需拉片確認尚未標記完成）；點擊可重新上鎖';
+          lockBtn.setAttribute('aria-label', '已開鎖，點擊重新上鎖');
+        } else {
+          lockBtn.classList.add('bg-zinc-200', 'border-zinc-300', 'text-zinc-600');
+          lockBtn.classList.remove('bg-amber-50', 'border-amber-400', 'text-amber-800');
+          lockBtn.title = '點擊開鎖後可進行簽核；建議先點「已拉片完成」';
+          lockBtn.setAttribute('aria-label', '點擊開鎖簽核');
+        }
+        if (lockIcon) lockIcon.textContent = verifySignOffUnlocked ? 'lock_open' : 'lock';
+      }
+    }
+    if (followUpDoneBtn) {
+      followUpDoneBtn.classList.toggle('hidden', !pendingFollowUp);
+    }
   }
 
   function refreshReportFromParent() {
@@ -326,18 +403,64 @@
     if (confirmBtn) {
       confirmBtn.addEventListener('click', function () {
         var s = getSpecimen();
+        if (s && typeof needsPendingFollowUpReview === 'function' && needsPendingFollowUpReview(s) && !verifySignOffUnlocked) return;
         var sid = s ? s.id : '';
         var navigateNextDigitalReview = false;
+        var dismissAiAlertOnVerify = false;
         if (s) {
           var effective = getEffectiveMetricsForRisk(s);
           var risk = getRiskState(s, effective);
-          // 綠色/黃色簽核後，直接銜接下一筆；紅色（新發留單）不自動跳轉。
           navigateNextDigitalReview = !risk.hasNewLeave;
+          dismissAiAlertOnVerify = specimenHasAiAlert(s) && !risk.hasNewLeave && !risk.hasLeaveNow;
         }
         if (window.self !== window.top && window.parent) {
-          window.parent.postMessage({ type: 'reportVerified', specimenId: sid, navigateNextDigitalReview: navigateNextDigitalReview }, '*');
+          window.parent.postMessage({
+            type: 'reportVerified',
+            specimenId: sid,
+            navigateNextDigitalReview: navigateNextDigitalReview,
+            dismissAiAlertOnVerify: dismissAiAlertOnVerify
+          }, '*');
         } else if (typeof goToSpecimenList === 'function') {
+          if (s && typeof buildWorkflowDoneOnReportVerified === 'function' && typeof persistSpecimenStatusOverride === 'function') {
+            var built = buildWorkflowDoneOnReportVerified(s, { dismissAiAlertOnVerify: dismissAiAlertOnVerify });
+            s.status = built.status;
+            s.workflowDone = built.workflowDone;
+            s.statusDone = typeof computeSpecimenStatusDoneFromWorkflow === 'function'
+              ? computeSpecimenStatusDoneFromWorkflow(s.status, s.workflowDone)
+              : false;
+            var editorAccount = typeof getCurrentUserAccount === 'function' ? getCurrentUserAccount() : '';
+            if (!s.statusDone) s.editor = '';
+            else if (editorAccount) s.editor = editorAccount;
+            persistSpecimenStatusOverride(sid, s.status, { workflowDone: s.workflowDone, editor: s.editor || '' });
+          }
+          if (s && s.statusDone && typeof queueReportVerifiedToast === 'function') queueReportVerifiedToast(sid);
           goToSpecimenList();
+        }
+      });
+    }
+
+    var verifyLockBtn = document.getElementById('verify-lock-btn');
+    if (verifyLockBtn) {
+      verifyLockBtn.addEventListener('click', function () {
+        var s = getSpecimen();
+        if (!s || typeof needsPendingFollowUpReview !== 'function' || !needsPendingFollowUpReview(s)) return;
+        verifySignOffUnlocked = !verifySignOffUnlocked;
+        applyReportFooterActions(s);
+      });
+    }
+
+    var followUpDoneBtn = document.getElementById('follow-up-done-btn');
+    if (followUpDoneBtn) {
+      followUpDoneBtn.addEventListener('click', function () {
+        var s = getSpecimen();
+        if (!s || typeof needsPendingFollowUpReview !== 'function' || !needsPendingFollowUpReview(s)) return;
+        var sid = s.id;
+        if (window.self !== window.top && window.parent) {
+          window.parent.postMessage({ type: 'reportFollowUpDone', specimenId: sid }, '*');
+        } else {
+          if (typeof markFollowUpReviewDone === 'function') markFollowUpReviewDone(sid);
+          if (typeof queueFollowUpDoneToast === 'function') queueFollowUpDoneToast(sid);
+          if (typeof goToSpecimenList === 'function') goToSpecimenList();
         }
       });
     }
@@ -346,15 +469,18 @@
     if (manualAlertBtn) {
       manualAlertBtn.addEventListener('click', function () {
         var s = getSpecimen();
-        if (!s) return;
-        var effective = getEffectiveMetricsForRisk(s);
-        var risk = getRiskState(s, effective);
-        if (!risk.hasNewLeave) return;
-        addManualAlertFromReport(s); // 先刷新本頁膠囊，再關閉並返回檢體管理
+        if (!s || !isAiAlertPendingConfirmation(s)) return;
+        var result = addFollowUpForManualReviewFromReport(s);
+        var addedFollowUp = !!(result && result.addedFollowUp);
+        refreshReportFromParent();
         if (window.self !== window.top && window.parent) {
-          window.parent.postMessage({ type: 'reportManualAlert', specimenId: s.id }, '*');
+          window.parent.postMessage({
+            type: 'reportManualAlert',
+            specimenId: s.id,
+            addedFollowUp: addedFollowUp
+          }, '*');
         } else if (typeof goToSpecimenList === 'function') {
-          if (typeof queueManualAlertToast === 'function') queueManualAlertToast(s.id);
+          if (typeof queueManualAlertToast === 'function') queueManualAlertToast(s.id, addedFollowUp);
           goToSpecimenList();
         }
       });

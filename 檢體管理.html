@@ -92,7 +92,6 @@
             <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="AI Alert"/> <span class="ml-1">AI Alert</span></label>
             <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Follow-up"/> <span class="ml-1">Follow-up</span></label>
             <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Digital Review"/> <span class="ml-1">Digital Review</span></label>
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Manual Alert"/> <span class="ml-1">Manual Alert</span></label>
             <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Verified"/> <span class="ml-1">Verified</span></label>
             <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Locked"/> <span class="ml-1">Locked</span></label>
           </div>
@@ -232,8 +231,8 @@
     <button type="button" id="specimen-ctx-reopen-dr" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-text-light text-xs font-medium">退回 Digital Review</button>
   </div>
 
-  <script src="assets/data/database.js?v=20260411b"></script>
-  <script src="assets/js/common.js?v=20260411d"></script>
+  <script src="assets/data/database.js?v=20260531k"></script>
+  <script src="assets/js/common.js?v=20260531k"></script>
   <script src="assets/js/tutorial.js?v=20260411d"></script>
   <script>
     (function () {
@@ -251,7 +250,7 @@
         sortKey: 'time',
         sortAsc: false,
         /** 未選模式時顯示所有狀態 */
-        statusFiltersAll: ['PLT Check', 'AI Alert', 'Follow-up', 'Digital Review', 'Manual Alert', 'Verified', 'Locked'],
+        statusFiltersAll: ['PLT Check', 'AI Alert', 'Follow-up', 'Digital Review', 'Verified', 'Locked'],
         demoDate: '2025-08-07'
       };
 
@@ -415,13 +414,19 @@
           if (statusKey === 'Digital Review' && typeof isDigitalReviewDone === 'function') {
             return !isDigitalReviewDone(specimen);
           }
+          if (statusKey === 'AI Alert' && currentMode === 'digital') {
+            return typeof matchesAiAlertForDigitalList === 'function' ? matchesAiAlertForDigitalList(specimen) : hasTag;
+          }
           if (typeof isEntityStatusCompleted === 'function' &&
-              (statusKey === 'PLT Check' || statusKey === 'Follow-up' || statusKey === 'AI Alert' || statusKey === 'Manual Alert')) {
+              (statusKey === 'PLT Check' || statusKey === 'Follow-up' || statusKey === 'AI Alert')) {
             return !isEntityStatusCompleted(specimen, statusKey);
           }
           return true;
         }
         filteredList = MOCK_SPECIMENS.filter(function (s) {
+          if (currentMode === 'digital' && typeof shouldExcludeFromDigitalSpecimenList === 'function' && shouldExcludeFromDigitalSpecimenList(s)) {
+            return false;
+          }
           if (f.dateStart && s.analysisTime) {
             var docDate = s.analysisTime.slice(0, 10).replace(/\//g, '-');
             if (docDate < f.dateStart) return false;
@@ -504,7 +509,8 @@
           html += '<span class="status-capsule ' + style + '" data-status="' + st + '">';
           if (drCompleted || entityCompleted) html += '<span class="material-symbols-outlined text-xs mr-1">check</span>';
           if (st === 'Locked') html += '<span class="material-symbols-outlined text-xs mr-1">lock</span>';
-          html += st + '</span>';
+          var displayLabel = typeof getStatusDisplayLabel === 'function' ? getStatusDisplayLabel(st) : st;
+          html += displayLabel + '</span>';
         });
         return html;
       }
@@ -591,7 +597,7 @@
           var specimen = specimenId ? getSpecimenById(specimenId) : null;
           if (!specimen || !statusKey) return;
           if (specimen.locked) return;
-          if (statusKey !== 'PLT Check' && statusKey !== 'Follow-up' && statusKey !== 'AI Alert' && statusKey !== 'Manual Alert') return;
+          if (statusKey !== 'PLT Check' && statusKey !== 'Follow-up' && statusKey !== 'AI Alert') return;
           if (!specimen.workflowDone || typeof specimen.workflowDone !== 'object') {
             specimen.workflowDone = { digitalReview: false, entityReview: false, entityStatusDone: {} };
           }
@@ -601,9 +607,12 @@
           var beforeComplete = typeof isSpecimenWorkflowCompleted === 'function' ? isSpecimenWorkflowCompleted(specimen) : false;
           var current = !!specimen.workflowDone.entityStatusDone[statusKey];
           specimen.workflowDone.entityStatusDone[statusKey] = !current;
+          if (statusKey === 'Follow-up' && !current && typeof isAiAlertAndFollowUpSpecimen === 'function' && isAiAlertAndFollowUpSpecimen(specimen) && (specimen.status || []).indexOf('AI Alert') !== -1) {
+            specimen.workflowDone.entityStatusDone['AI Alert'] = true;
+          }
           var st = specimen.status || [];
           var entityStatuses = st.filter(function (x) {
-            return x === 'PLT Check' || x === 'Follow-up' || x === 'AI Alert' || x === 'Manual Alert';
+            return x === 'PLT Check' || x === 'Follow-up' || x === 'AI Alert';
           });
           specimen.workflowDone.entityReview = entityStatuses.length > 0 && entityStatuses.every(function (x) {
             return !!specimen.workflowDone.entityStatusDone[x];
@@ -990,14 +999,49 @@
       renderTable();
       persistSpecimenListUiState();
 
-      var manualAlertToastId = typeof consumeManualAlertToastQueue === 'function' ? consumeManualAlertToastQueue() : null;
+      var manualAlertToast = typeof consumeManualAlertToastQueue === 'function' ? consumeManualAlertToastQueue() : null;
+      var manualAlertToastId = manualAlertToast && manualAlertToast.specimenId ? manualAlertToast.specimenId : null;
       if (manualAlertToastId) {
         var toastEl = document.getElementById('specimen-list-toast');
         var toastText = document.getElementById('specimen-list-toast-text');
         if (toastEl && toastText) {
-          toastText.textContent = manualAlertToastId + ' 已歸入 Manual Alert，等待人工鏡檢';
+          toastText.textContent = manualAlertToast.addedFollowUp
+            ? manualAlertToastId + ' 已歸入需拉片確認，等待人工鏡檢'
+            : manualAlertToastId + ' 已確認 AI分類警示';
           toastEl.classList.remove('hidden');
           setTimeout(function () { toastEl.classList.add('hidden'); }, 6000);
+        }
+      }
+      var followUpDoneToast = typeof consumeFollowUpDoneToastQueue === 'function' ? consumeFollowUpDoneToastQueue() : null;
+      var followUpDoneToastId = followUpDoneToast && followUpDoneToast.specimenId ? followUpDoneToast.specimenId : null;
+      if (followUpDoneToastId) {
+        var toastEl2 = document.getElementById('specimen-list-toast');
+        var toastText2 = document.getElementById('specimen-list-toast-text');
+        if (toastEl2 && toastText2) {
+          toastText2.textContent = followUpDoneToast.workflowCompleted
+            ? followUpDoneToastId + ' 已標記拉片完成，檢體流程已完成'
+            : followUpDoneToastId + ' 已標記拉片完成，尚有其他待辦';
+          toastEl2.classList.remove('hidden');
+          setTimeout(function () { toastEl2.classList.add('hidden'); }, 6000);
+        }
+        if (filteredList.some(function (r) { return r.id === followUpDoneToastId; })) {
+          selectRow(followUpDoneToastId);
+        }
+      }
+      var reportVerifiedToast = typeof consumeReportVerifiedToastQueue === 'function' ? consumeReportVerifiedToastQueue() : null;
+      var reportVerifiedToastId = reportVerifiedToast && reportVerifiedToast.specimenId ? reportVerifiedToast.specimenId : null;
+      if (reportVerifiedToastId) {
+        var toastEl3 = document.getElementById('specimen-list-toast');
+        var toastText3 = document.getElementById('specimen-list-toast-text');
+        if (toastEl3 && toastText3) {
+          toastText3.textContent = reportVerifiedToast.workflowCompleted
+            ? reportVerifiedToastId + ' 簽核完成，檢體流程已完成'
+            : reportVerifiedToastId + ' 簽核完成，尚有其他待辦';
+          toastEl3.classList.remove('hidden');
+          setTimeout(function () { toastEl3.classList.add('hidden'); }, 6000);
+        }
+        if (filteredList.some(function (r) { return r.id === reportVerifiedToastId; })) {
+          selectRow(reportVerifiedToastId);
         }
       }
       if (manualAlertToastId && filteredList.some(function (r) { return r.id === manualAlertToastId; })) {

@@ -237,21 +237,143 @@ function getPrevReportHeaderLabel(spec, baseLabel) {
 /** 從報告核發「改為人工鏡檢」返回檢體管理時，顯示一次性提示（sessionStorage 單次消耗） */
 var MANUAL_ALERT_TOAST_STORAGE_KEY = 'blood-morphology-manual-alert-toast';
 
-function queueManualAlertToast(specimenId) {
+function queueManualAlertToast(specimenId, addedFollowUp) {
   if (!specimenId) return;
   try {
-    sessionStorage.setItem(MANUAL_ALERT_TOAST_STORAGE_KEY, JSON.stringify({ specimenId: String(specimenId) }));
+    sessionStorage.setItem(
+      MANUAL_ALERT_TOAST_STORAGE_KEY,
+      JSON.stringify({
+        specimenId: String(specimenId),
+        addedFollowUp: addedFollowUp !== false
+      })
+    );
   } catch (e) {}
 }
 
-/** 讀取並清除佇列；若無則回傳 null */
+/** 讀取並清除佇列；回傳 { specimenId, addedFollowUp } 或 null */
 function consumeManualAlertToastQueue() {
   try {
     var raw = sessionStorage.getItem(MANUAL_ALERT_TOAST_STORAGE_KEY);
     if (!raw) return null;
     sessionStorage.removeItem(MANUAL_ALERT_TOAST_STORAGE_KEY);
     var parsed = JSON.parse(raw);
-    return parsed && parsed.specimenId ? String(parsed.specimenId) : null;
+    if (!parsed || !parsed.specimenId) return null;
+    return {
+      specimenId: String(parsed.specimenId),
+      addedFollowUp: parsed.addedFollowUp !== false
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+var FOLLOW_UP_DONE_TOAST_STORAGE_KEY = 'blood-morphology-follow-up-done-toast';
+var REPORT_VERIFIED_TOAST_STORAGE_KEY = 'blood-morphology-report-verified-toast';
+
+function queueReportVerifiedToast(specimenId) {
+  if (!specimenId) return;
+  try {
+    var completed = false;
+    if (typeof getSpecimenById === 'function' && typeof isSpecimenWorkflowCompleted === 'function') {
+      var spec = getSpecimenById(specimenId);
+      completed = !!(spec && isSpecimenWorkflowCompleted(spec));
+    }
+    sessionStorage.setItem(REPORT_VERIFIED_TOAST_STORAGE_KEY, JSON.stringify({
+      specimenId: String(specimenId),
+      workflowCompleted: completed
+    }));
+  } catch (e) {}
+}
+
+function consumeReportVerifiedToastQueue() {
+  try {
+    var raw = sessionStorage.getItem(REPORT_VERIFIED_TOAST_STORAGE_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(REPORT_VERIFIED_TOAST_STORAGE_KEY);
+    var parsed = JSON.parse(raw);
+    if (!parsed || !parsed.specimenId) return null;
+    return {
+      specimenId: String(parsed.specimenId),
+      workflowCompleted: !!parsed.workflowCompleted
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function queueFollowUpDoneToast(specimenId) {
+  if (!specimenId) return;
+  try {
+    var completed = false;
+    if (typeof getSpecimenById === 'function' && typeof isSpecimenWorkflowCompleted === 'function') {
+      var spec = getSpecimenById(specimenId);
+      completed = !!(spec && isSpecimenWorkflowCompleted(spec));
+    }
+    sessionStorage.setItem(FOLLOW_UP_DONE_TOAST_STORAGE_KEY, JSON.stringify({
+      specimenId: String(specimenId),
+      workflowCompleted: completed
+    }));
+  } catch (e) {}
+}
+
+/** 檢體是否仍有待辦的需拉片確認（有膠囊且尚未綠勾） */
+function needsPendingFollowUpReview(spec) {
+  if (!spec || !Array.isArray(spec.status)) return false;
+  if (spec.status.indexOf('Follow-up') === -1) return false;
+  return typeof isEntityStatusCompleted === 'function' && !isEntityStatusCompleted(spec, 'Follow-up');
+}
+
+/** 標記需拉片確認完成（與列表點膠囊／報告「已拉片完成」共用） */
+function markFollowUpReviewDone(specimenId) {
+  if (!specimenId || typeof getSpecimenById !== 'function') return false;
+  var spec = getSpecimenById(specimenId);
+  if (!spec || !Array.isArray(spec.status) || spec.status.indexOf('Follow-up') === -1) return false;
+  if (typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(spec, 'Follow-up')) return true;
+  if (!spec.workflowDone || typeof spec.workflowDone !== 'object') {
+    spec.workflowDone = { digitalReview: false, entityReview: false, entityStatusDone: {} };
+  }
+  if (!spec.workflowDone.entityStatusDone || typeof spec.workflowDone.entityStatusDone !== 'object') {
+    spec.workflowDone.entityStatusDone = {};
+  }
+  spec.workflowDone.entityStatusDone['Follow-up'] = true;
+  /** AI+需拉片雙旗標：拉片完成視同已確認 AI 警示，一併綠勾並可整筆結案 */
+  if (typeof isAiAlertAndFollowUpSpecimen === 'function' && isAiAlertAndFollowUpSpecimen(spec) && spec.status.indexOf('AI Alert') !== -1) {
+    spec.workflowDone.entityStatusDone['AI Alert'] = true;
+  }
+  var entityStatuses = spec.status.filter(function (x) {
+    return ENTITY_REVIEW_STATUS_SET.indexOf(x) !== -1;
+  });
+  spec.workflowDone.entityReview = entityStatuses.length > 0 && entityStatuses.every(function (k) {
+    return !!spec.workflowDone.entityStatusDone[k];
+  });
+  spec.statusDone = typeof computeSpecimenStatusDoneFromWorkflow === 'function'
+    ? computeSpecimenStatusDoneFromWorkflow(spec.status, spec.workflowDone)
+    : false;
+  if (!spec.statusDone) spec.editor = '';
+  else {
+    var editorAccount = typeof getCurrentUserAccount === 'function' ? getCurrentUserAccount() : '';
+    if (editorAccount) spec.editor = editorAccount;
+  }
+  if (typeof persistSpecimenStatusOverride === 'function') {
+    persistSpecimenStatusOverride(specimenId, spec.status, {
+      workflowDone: spec.workflowDone,
+      editor: spec.editor || ''
+    });
+  }
+  return true;
+}
+
+function consumeFollowUpDoneToastQueue() {
+  try {
+    var raw = sessionStorage.getItem(FOLLOW_UP_DONE_TOAST_STORAGE_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(FOLLOW_UP_DONE_TOAST_STORAGE_KEY);
+    var parsed = JSON.parse(raw);
+    if (!parsed || !parsed.specimenId) return null;
+    return {
+      specimenId: String(parsed.specimenId),
+      workflowCompleted: !!parsed.workflowCompleted
+    };
   } catch (e) {
     return null;
   }
@@ -329,20 +451,161 @@ const STATUS_STYLES = {
   'Digital Review': 'bg-purple-100 text-purple-800',
   'AI Alert': 'bg-orange-100 text-orange-800',
   'Follow-up': 'bg-red-100 text-red-800',
-  'Manual Alert': 'bg-amber-100 text-amber-950',
   'Verified': 'bg-green-100 text-green-800',
   'Locked': 'bg-gray-200 text-gray-800 border border-gray-300'
 };
 
+/** 狀態膠囊顯示用中文（內部 key 仍為英文） */
+var STATUS_DISPLAY_LABELS = {
+  'PLT Check': '血小板確認',
+  'Digital Review': '數位閱片',
+  'AI Alert': 'AI分類警示',
+  'Follow-up': '需拉片確認',
+  'Locked': '鎖定中',
+  'Verified': '已完成'
+};
+
+function getStatusDisplayLabel(statusKey) {
+  if (!statusKey) return '';
+  return STATUS_DISPLAY_LABELS[statusKey] || statusKey;
+}
+
+/** 舊版 Manual Alert 併入需拉片確認（Follow-up） */
+function migrateLegacyManualAlertStatus(statusArr) {
+  if (!Array.isArray(statusArr)) return [];
+  var st = statusArr.slice();
+  if (st.indexOf('Manual Alert') === -1) return st;
+  st = st.filter(function (x) { return x !== 'Manual Alert'; });
+  if (st.indexOf('Follow-up') === -1) st.push('Follow-up');
+  return st;
+}
+
+function migrateLegacyEntityStatusDone(entityStatusDone) {
+  if (!entityStatusDone || typeof entityStatusDone !== 'object') return {};
+  var out = {};
+  Object.keys(entityStatusDone).forEach(function (k) {
+    if (k === 'Manual Alert') {
+      if (out['Follow-up'] === undefined) out['Follow-up'] = !!entityStatusDone[k];
+      return;
+    }
+    out[k] = !!entityStatusDone[k];
+  });
+  return out;
+}
+
 // 模式預設勾選的狀態（數位閱片 / 實體作業）
 const MODE_DEFAULT_STATUS = {
-  digital: ['Digital Review'],
-  entity: ['Follow-up', 'PLT Check', 'AI Alert', 'Manual Alert']
+  digital: ['Digital Review', 'AI Alert'],
+  entity: ['Follow-up', 'PLT Check']
 };
+
+/** 同時具 AI分類警示與需拉片確認：僅在實體作業清單顯示 */
+function isAiAlertAndFollowUpSpecimen(spec) {
+  if (!spec || !Array.isArray(spec.status)) return false;
+  var st = spec.status;
+  return st.indexOf('AI Alert') !== -1 && st.indexOf('Follow-up') !== -1;
+}
+
+/** 是否仍有待辦的數位閱片流程（含僅 AI 警示、尚未簽核結案者） */
+function hasPendingDigitalReviewWork(spec) {
+  if (!spec || !Array.isArray(spec.status)) return false;
+  if (isAiAlertAndFollowUpSpecimen(spec)) return false;
+  var st = spec.status;
+  if (st.indexOf('Digital Review') >= 0) {
+    return typeof isDigitalReviewDone === 'function' && !isDigitalReviewDone(spec);
+  }
+  if (st.indexOf('AI Alert') >= 0 && matchesAiAlertForDigitalList(spec)) {
+    return typeof isEntityStatusCompleted === 'function' && !isEntityStatusCompleted(spec, 'AI Alert');
+  }
+  return false;
+}
+
+/**
+ * 數位閱片模式清單排除：雙旗標（AI+需拉片）或數位流程已結案僅剩實體待辦（如血小板確認）。
+ * 整體流程已完成者不排除，以便在 Verified 篩選下仍可見。
+ */
+function shouldExcludeFromDigitalSpecimenList(spec) {
+  if (isAiAlertAndFollowUpSpecimen(spec)) return true;
+  if (typeof isSpecimenWorkflowCompleted === 'function' && isSpecimenWorkflowCompleted(spec)) {
+    return false;
+  }
+  return !hasPendingDigitalReviewWork(spec);
+}
+
+function matchesAiAlertForDigitalList(spec) {
+  if (!spec || !Array.isArray(spec.status) || spec.status.indexOf('AI Alert') === -1) return false;
+  return spec.status.indexOf('Follow-up') === -1;
+}
+
+/**
+ * 報告端「改為人工鏡檢」：將 AI分類警示標為已確認（綠勾）；若尚無需拉片確認則加入。
+ */
+function buildWorkflowDoneAfterManualFollowUpFromReport(spec, statusArr) {
+  var wf = normalizeWorkflowDone(spec && spec.workflowDone, spec && spec.statusDone);
+  var entityStatusDone = {};
+  ENTITY_REVIEW_STATUS_SET.forEach(function (k) {
+    if (wf.entityStatusDone && wf.entityStatusDone[k] !== undefined) {
+      entityStatusDone[k] = !!wf.entityStatusDone[k];
+    }
+  });
+  var st = Array.isArray(statusArr) ? statusArr : (spec && spec.status) || [];
+  if (st.indexOf('AI Alert') !== -1) {
+    entityStatusDone['AI Alert'] = true;
+  }
+  if (st.indexOf('Follow-up') !== -1) {
+    entityStatusDone['Follow-up'] = false;
+  }
+  return {
+    digitalReview: !!wf.digitalReview,
+    entityReview: false,
+    entityStatusDone: entityStatusDone
+  };
+}
+
+/**
+ * 報告簽核完成：
+ * - 原本即有 Digital Review：標記數位閱片完成。
+ * - 僅 AI Alert、綠色橫幅誤報排除（dismissAiAlertOnVerify）：AI 綠勾，並「新增」數位閱片膠囊且綠勾（表示以數位流程直接結案）。
+ */
+function buildWorkflowDoneOnReportVerified(spec, options) {
+  options = options || {};
+  var wf = normalizeWorkflowDone(spec && spec.workflowDone, spec && spec.statusDone);
+  var entityStatusDone = {};
+  ENTITY_REVIEW_STATUS_SET.forEach(function (k) {
+    if (wf.entityStatusDone && wf.entityStatusDone[k] !== undefined) {
+      entityStatusDone[k] = !!wf.entityStatusDone[k];
+    }
+  });
+  var st = spec && Array.isArray(spec.status) ? spec.status.slice().filter(function (x) { return x !== 'Verified'; }) : [];
+  var hadDigitalReview = st.indexOf('Digital Review') !== -1;
+
+  if (hadDigitalReview) {
+    wf.digitalReview = true;
+  }
+
+  if (options.dismissAiAlertOnVerify) {
+    if (st.indexOf('AI Alert') !== -1) {
+      entityStatusDone['AI Alert'] = true;
+    }
+    if (!hadDigitalReview) {
+      st.push('Digital Review');
+      wf.digitalReview = true;
+    }
+  }
+
+  var entityStatuses = st.filter(function (x) {
+    return ENTITY_REVIEW_STATUS_SET.indexOf(x) !== -1;
+  });
+  wf.entityReview = entityStatuses.length === 0 || entityStatuses.every(function (k) {
+    return entityStatusDone[k] === true;
+  });
+  wf.entityStatusDone = entityStatusDone;
+  return { status: st, workflowDone: wf };
+}
 
 /** 手動增刪 flag／簽核完成狀態覆寫（新版：status + workflowDone） */
 var APP_SPECIMEN_STATUS_STORAGE_KEY = 'blood-morphology-specimen-status';
-var ENTITY_REVIEW_STATUS_SET = ['PLT Check', 'Follow-up', 'AI Alert', 'Manual Alert'];
+var ENTITY_REVIEW_STATUS_SET = ['PLT Check', 'Follow-up', 'AI Alert'];
 
 function normalizeWorkflowDone(rawWorkflow, rawStatusDone) {
   var digitalReview = false;
@@ -352,9 +615,10 @@ function normalizeWorkflowDone(rawWorkflow, rawStatusDone) {
     digitalReview = !!rawWorkflow.digitalReview;
     entityReview = !!rawWorkflow.entityReview;
     if (rawWorkflow.entityStatusDone && typeof rawWorkflow.entityStatusDone === 'object') {
+      var migratedDone = migrateLegacyEntityStatusDone(rawWorkflow.entityStatusDone);
       ENTITY_REVIEW_STATUS_SET.forEach(function (k) {
-        if (rawWorkflow.entityStatusDone[k] !== undefined) {
-          entityStatusDone[k] = !!rawWorkflow.entityStatusDone[k];
+        if (migratedDone[k] !== undefined) {
+          entityStatusDone[k] = !!migratedDone[k];
         }
       });
     }
@@ -372,7 +636,7 @@ function normalizeStatusStorageEntry(raw) {
   if (raw == null) return { status: [], statusDone: false, workflowDone: normalizeWorkflowDone(null, false), editor: '' };
   if (Array.isArray(raw)) {
     return {
-      status: raw.slice().filter(function (x) { return x !== 'Verified'; }),
+      status: migrateLegacyManualAlertStatus(raw.slice().filter(function (x) { return x !== 'Verified'; })),
       statusDone: false,
       workflowDone: normalizeWorkflowDone(null, false),
       editor: ''
@@ -380,7 +644,7 @@ function normalizeStatusStorageEntry(raw) {
   }
   if (raw && typeof raw === 'object' && Array.isArray(raw.status)) {
     return {
-      status: raw.status.slice().filter(function (x) { return x !== 'Verified'; }),
+      status: migrateLegacyManualAlertStatus(raw.status.slice().filter(function (x) { return x !== 'Verified'; })),
       statusDone: !!raw.statusDone,
       workflowDone: normalizeWorkflowDone(raw.workflowDone, raw.statusDone),
       editor: typeof raw.editor === 'string' ? raw.editor : ''
@@ -440,7 +704,9 @@ function persistSpecimenStatusOverride(specimenId, statusArray, options) {
     }
     if (!map || typeof map !== 'object') map = {};
     var prev = normalizeStatusStorageEntry(map[specimenId]);
-    var nextStatus = Array.isArray(statusArray) ? statusArray.slice().filter(function (x) { return x !== 'Verified'; }) : [];
+    var nextStatus = migrateLegacyManualAlertStatus(
+      Array.isArray(statusArray) ? statusArray.slice().filter(function (x) { return x !== 'Verified'; }) : []
+    );
     var workflowInput = prev.workflowDone;
     if (options && options.workflowDone && typeof options.workflowDone === 'object') {
       var prevEntityStatusDone = (prev.workflowDone && prev.workflowDone.entityStatusDone) ? prev.workflowDone.entityStatusDone : {};
@@ -495,7 +761,7 @@ function applySpecimenStatusOverridesFromStorage() {
       var spec = APP_DATABASE.specimens.find(function (s) { return s.id === id; });
       if (!spec) return;
       var ent = normalizeStatusStorageEntry(map[id]);
-      spec.status = ent.status;
+      spec.status = migrateLegacyManualAlertStatus(ent.status);
       spec.workflowDone = normalizeWorkflowDone(ent.workflowDone, ent.statusDone);
       spec.statusDone = computeSpecimenStatusDoneFromWorkflow(spec.status, spec.workflowDone);
       if (!spec.statusDone) spec.editor = '';

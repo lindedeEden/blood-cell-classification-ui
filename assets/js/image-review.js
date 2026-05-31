@@ -53,6 +53,22 @@
   );
   var DEFAULT_IMAGE = CELL_PLACEHOLDER_SVG;
 
+  /** 依類別從 CELL_SAMPLE_IMAGES 輪替指派真實範例圖；無對照時用占位 SVG */
+  function resolveCellImageUrl(category, indexInCategory) {
+    var samples = (typeof window.CELL_SAMPLE_IMAGES !== 'undefined' && window.CELL_SAMPLE_IMAGES)
+      ? window.CELL_SAMPLE_IMAGES
+      : null;
+    if (!samples) return DEFAULT_IMAGE;
+    var pool = samples[category];
+    if ((!pool || !pool.length) && category === 'Abnormal Lymphocyte' && samples['Atypical Lymphocyte']) {
+      pool = samples['Atypical Lymphocyte'];
+    }
+    if (!pool || !pool.length) return DEFAULT_IMAGE;
+    var rel = pool[(indexInCategory || 0) % pool.length];
+    var base = (typeof window.getBasePath === 'function') ? window.getBasePath() : '';
+    return base + rel;
+  }
+
   var currentSpecimenId = '';
   var currentSpecimen = null;
   var digitalReviewList = [];
@@ -88,7 +104,9 @@
   }
 
   function applyReadOnlyChrome() {
-    if (!readOnlyMode) return;
+    if (!readOnlyMode) {
+      return;
+    }
     var banner = document.getElementById('image-review-readonly-banner');
     if (banner) {
       banner.classList.remove('hidden');
@@ -121,7 +139,12 @@
       if (s.locked) return false;
       var st = s.status || [];
       var done = typeof isDigitalReviewDone === 'function' ? isDigitalReviewDone(s) : !!s.statusDone;
-      return st.indexOf('Digital Review') >= 0 && !done;
+      if (st.indexOf('Digital Review') >= 0 && !done) return true;
+      if (st.indexOf('AI Alert') >= 0 && typeof matchesAiAlertForDigitalList === 'function' && matchesAiAlertForDigitalList(s)) {
+        if (typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(s, 'AI Alert')) return false;
+        return !done;
+      }
+      return false;
     });
   }
 
@@ -180,7 +203,7 @@
           list.push({
             id: 'cell-' + (++id),
             category: catName,
-            imageUrl: DEFAULT_IMAGE,
+            imageUrl: resolveCellImageUrl(catName, i),
             aiSuggestion: catName === 'Segmented Neutrophil' ? { label: 'Segmented', pct: 92 } : (catName === 'Blast' ? { label: 'Blast', pct: 88 } : null)
           });
         }
@@ -201,12 +224,11 @@
     var id = 0;
     var list = [];
     categories.forEach(function (cat) {
-      var imageUrl = DEFAULT_IMAGE;
       for (var i = 0; i < cat.count; i++) {
         list.push({
           id: 'cell-' + (++id),
           category: cat.name,
-          imageUrl: imageUrl,
+          imageUrl: resolveCellImageUrl(cat.name, i),
           aiSuggestion: cat.name === 'Segmented Neutrophil' ? { label: 'Segmented', pct: 92 } : (cat.name === 'Blast' ? { label: 'Blast', pct: 88 } : null)
         });
       }
@@ -214,17 +236,15 @@
     return list;
   }
 
-  function isLeaveConditionReachedByCurrentCells(category, count, pct, prevReport) {
+  function isLeaveConditionReachedByCurrentCells(category, count, pct) {
     var metricKey = CATEGORY_TO_METRIC_KEY[category];
     if (!metricKey) return false;
     var threshold = typeof LEAVE_THRESHOLDS !== 'undefined' ? LEAVE_THRESHOLDS[metricKey] : undefined;
     if (threshold == null) return false;
     var currentValue = threshold === 'present' ? count : pct;
-    var prevValue = prevReport && prevReport[metricKey] != null ? prevReport[metricKey] : null;
-    if (typeof isNewLeaveConditionByKey === 'function') {
-      return isNewLeaveConditionByKey(metricKey, currentValue, prevValue);
+    if (typeof isAbnormalMetricValue === 'function') {
+      return isAbnormalMetricValue(metricKey, currentValue);
     }
-    // fallback：若共用函式不可用，退回原先「只看本次是否達標」。
     if (threshold === 'present') return count > 0;
     if (typeof threshold === 'number') return pct >= threshold;
     return false;
@@ -319,9 +339,12 @@
       var displayStatuses = statuses.filter(function (s) { return s !== 'Verified'; });
       tagsContainer.innerHTML = displayStatuses.map(function (s) {
         var style;
-        var label = s;
+        var label = typeof getStatusDisplayLabel === 'function' ? getStatusDisplayLabel(s) : s;
         var prefixIcon = '';
-        if (s === 'AI Alert') style = 'bg-orange-100 text-orange-800';
+        if (s === 'AI Alert' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(specimen, 'AI Alert')) {
+          style = 'bg-green-100 text-green-800';
+          prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
+        } else if (s === 'AI Alert') style = 'bg-orange-100 text-orange-800';
         else if (s === 'PLT Check') style = 'bg-blue-100 text-blue-800';
         else if (s === 'Follow-up' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(specimen, 'Follow-up')) {
           style = 'bg-green-100 text-green-800';
@@ -331,7 +354,6 @@
           style = 'bg-green-100 text-green-800';
           prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
         } else if (s === 'Digital Review') style = 'bg-purple-100 text-purple-800';
-        else if (s === 'Manual Alert' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['Manual Alert'] || 'bg-amber-100 text-amber-950';
         else style = 'bg-gray-100 text-gray-800';
         return '<div class="group relative inline-flex items-center gap-1 px-3 py-1 rounded-full ' + style + ' text-[10px] font-bold uppercase tracking-wider" data-status="' + s + '">' + prefixIcon + label + ' <span class="material-symbols-outlined text-[14px] hidden group-hover:inline cursor-pointer">close</span></div>';
       }).join('');
@@ -339,7 +361,7 @@
       if (addFlag && !document.querySelector('#sidebar-status-tags + .relative')) {
         var wrap = document.createElement('div');
         wrap.className = 'relative dropdown-container';
-        wrap.innerHTML = '<button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-gray-600 text-[10px] font-medium hover:bg-gray-50" id="add-flag-btn"><span class="material-symbols-outlined text-sm">add</span> Add Flag</button><div class="dropdown-menu absolute left-0 top-full mt-2 w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-50 hidden"><div class="p-2 border-b border-gray-200"><span class="text-[10px] font-bold text-gray-500 uppercase">新增標記</span></div><div class="p-1"><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="AI Alert">AI Alert</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="PLT Check">PLT Check</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Follow-up">Follow-up</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Manual Alert">Manual Alert</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Digital Review">Digital Review</button></div></div></div>';
+        wrap.innerHTML = '<button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-gray-600 text-[10px] font-medium hover:bg-gray-50" id="add-flag-btn"><span class="material-symbols-outlined text-sm">add</span> Add Flag</button><div class="dropdown-menu absolute left-0 top-full mt-2 w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-50 hidden"><div class="p-2 border-b border-gray-200"><span class="text-[10px] font-bold text-gray-500 uppercase">新增標記</span></div><div class="p-1"><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="AI Alert">' + (typeof getStatusDisplayLabel === 'function' ? getStatusDisplayLabel('AI Alert') : 'AI Alert') + '</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="PLT Check">' + (typeof getStatusDisplayLabel === 'function' ? getStatusDisplayLabel('PLT Check') : 'PLT Check') + '</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Follow-up">' + (typeof getStatusDisplayLabel === 'function' ? getStatusDisplayLabel('Follow-up') : 'Follow-up') + '</button><button type="button" class="w-full text-left px-2 py-2 hover:bg-gray-50 rounded text-xs" data-flag="Digital Review">' + (typeof getStatusDisplayLabel === 'function' ? getStatusDisplayLabel('Digital Review') : 'Digital Review') + '</button></div></div></div>';
         tagsContainer.parentNode.insertBefore(wrap, tagsContainer.nextSibling);
       }
       tagsContainer.querySelectorAll('[data-status]').forEach(function (el) {
@@ -443,6 +465,38 @@
     } catch (e) {}
   }
 
+  function syncEntityWorkflowAfterCapsuleToggle(statusKey, markDone) {
+    if (!currentSpecimen) return;
+    if (!currentSpecimen.workflowDone || typeof currentSpecimen.workflowDone !== 'object') {
+      currentSpecimen.workflowDone = { digitalReview: false, entityReview: false, entityStatusDone: {} };
+    }
+    if (!currentSpecimen.workflowDone.entityStatusDone || typeof currentSpecimen.workflowDone.entityStatusDone !== 'object') {
+      currentSpecimen.workflowDone.entityStatusDone = {};
+    }
+    currentSpecimen.workflowDone.entityStatusDone[statusKey] = !!markDone;
+    var st = currentSpecimen.status || [];
+    var entityStatuses = st.filter(function (x) {
+      return x === 'PLT Check' || x === 'Follow-up' || x === 'AI Alert';
+    });
+    currentSpecimen.workflowDone.entityReview = entityStatuses.length > 0 && entityStatuses.every(function (x) {
+      return !!currentSpecimen.workflowDone.entityStatusDone[x];
+    });
+    currentSpecimen.statusDone = typeof computeSpecimenStatusDoneFromWorkflow === 'function'
+      ? computeSpecimenStatusDoneFromWorkflow(st, currentSpecimen.workflowDone)
+      : false;
+    if (!currentSpecimen.statusDone) currentSpecimen.editor = '';
+    else {
+      var editorAccount = typeof getCurrentUserAccount === 'function' ? getCurrentUserAccount() : '';
+      if (editorAccount) currentSpecimen.editor = editorAccount;
+    }
+    if (typeof window.persistSpecimenStatusOverride === 'function') {
+      window.persistSpecimenStatusOverride(currentSpecimen.id, st, {
+        workflowDone: currentSpecimen.workflowDone,
+        editor: currentSpecimen.editor || ''
+      });
+    }
+  }
+
   function removeStatus(status) {
     if (!currentSpecimen || !currentSpecimen.status) return;
     currentSpecimen.status = currentSpecimen.status.filter(function (s) { return s !== status; });
@@ -456,19 +510,13 @@
 
   function addStatus(status) {
     if (!currentSpecimen) return;
+    if (status === 'Manual Alert') status = 'Follow-up';
     if (!Array.isArray(currentSpecimen.status)) currentSpecimen.status = [];
     var st = currentSpecimen.status.slice();
-    /** Manual Alert 與 Digital Review 互斥；其餘狀態保留 */
-    if (status === 'Manual Alert') {
-      st = st.filter(function (s) { return s !== 'Digital Review'; });
-    } else if (status === 'Digital Review') {
-      st = st.filter(function (s) { return s !== 'Manual Alert'; });
-    }
     if (st.indexOf(status) === -1) st.push(status);
     currentSpecimen.status = st;
-    var persistOpts = status === 'Manual Alert' ? { workflowDone: { entityReview: false } } : undefined;
     if (typeof window.persistSpecimenStatusOverride === 'function') {
-      window.persistSpecimenStatusOverride(currentSpecimen.id, currentSpecimen.status, persistOpts);
+      window.persistSpecimenStatusOverride(currentSpecimen.id, currentSpecimen.status);
     }
     digitalReviewList = getDigitalReviewList();
     renderSidebar();
@@ -1037,8 +1085,32 @@
         }
         var manualModal = document.getElementById('report-issue-modal');
         if (manualModal) manualModal.classList.add('hidden');
-        if (typeof queueManualAlertToast === 'function') queueManualAlertToast(manualAlertId);
-        if (typeof window.goToSpecimenList === 'function') window.goToSpecimenList();
+        if (typeof queueManualAlertToast === 'function') {
+          queueManualAlertToast(manualAlertId, data.addedFollowUp !== false);
+        }
+        if (typeof goToSpecimenList === 'function') {
+          goToSpecimenList();
+        } else if (typeof window.goToSpecimenList === 'function') {
+          window.goToSpecimenList();
+        }
+        return;
+      }
+      if (data.type === 'reportFollowUpDone') {
+        var followId = data.specimenId || currentSpecimenId;
+        if (!followId) return;
+        if (typeof markFollowUpReviewDone === 'function') {
+          markFollowUpReviewDone(followId);
+        } else if (currentSpecimen && currentSpecimen.id === followId) {
+          syncEntityWorkflowAfterCapsuleToggle('Follow-up', true);
+        }
+        if (typeof queueFollowUpDoneToast === 'function') queueFollowUpDoneToast(followId);
+        var followUpModal = document.getElementById('report-issue-modal');
+        if (followUpModal) followUpModal.classList.add('hidden');
+        if (typeof goToSpecimenList === 'function') {
+          goToSpecimenList();
+        } else if (typeof window.goToSpecimenList === 'function') {
+          window.goToSpecimenList();
+        }
         return;
       }
       if (data.type !== 'reportVerified') return;
@@ -1047,14 +1119,21 @@
       var spec = APP_DATABASE.specimens.find(function (s) { return s.id === id; });
       if (!spec) return;
       if (!Array.isArray(spec.status)) spec.status = [];
-      // 標記此檢體已完成「數位閱片」流程；實體作業是否完成由 entityReview 決定
-      if (!spec.workflowDone || typeof spec.workflowDone !== 'object') spec.workflowDone = {};
-      spec.workflowDone.digitalReview = true;
-      if (typeof spec.workflowDone.entityReview !== 'boolean') {
-        spec.workflowDone.entityReview = (typeof hasAnyEntityReviewTask === 'function') ? !hasAnyEntityReviewTask(spec) : false;
-      }
-      if (Array.isArray(spec.status)) {
-        spec.status = spec.status.filter(function (x) { return x !== 'Verified'; });
+      if (typeof buildWorkflowDoneOnReportVerified === 'function') {
+        var verifiedBuilt = buildWorkflowDoneOnReportVerified(spec, {
+          dismissAiAlertOnVerify: !!data.dismissAiAlertOnVerify
+        });
+        spec.status = verifiedBuilt.status;
+        spec.workflowDone = verifiedBuilt.workflowDone;
+      } else {
+        if (!spec.workflowDone || typeof spec.workflowDone !== 'object') spec.workflowDone = {};
+        spec.workflowDone.digitalReview = true;
+        if (typeof spec.workflowDone.entityReview !== 'boolean') {
+          spec.workflowDone.entityReview = (typeof hasAnyEntityReviewTask === 'function') ? !hasAnyEntityReviewTask(spec) : false;
+        }
+        if (Array.isArray(spec.status)) {
+          spec.status = spec.status.filter(function (x) { return x !== 'Verified'; });
+        }
       }
       spec.statusDone = typeof computeSpecimenStatusDoneFromWorkflow === 'function'
         ? computeSpecimenStatusDoneFromWorkflow(spec.status, spec.workflowDone)
@@ -1064,6 +1143,9 @@
       else if (editorAccount) spec.editor = editorAccount;
       if (typeof window.persistSpecimenStatusOverride === 'function') {
         window.persistSpecimenStatusOverride(id, spec.status, { workflowDone: spec.workflowDone, editor: spec.statusDone ? editorAccount : '' });
+      }
+      if (spec.statusDone && typeof queueReportVerifiedToast === 'function') {
+        queueReportVerifiedToast(id);
       }
       notifyReportIframeToRefresh();
       if (currentSpecimen && currentSpecimen.id === id) {

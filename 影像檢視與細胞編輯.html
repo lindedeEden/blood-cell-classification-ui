@@ -128,23 +128,19 @@
 <div class="p-1 space-y-0.5">
 <label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer group select-none" data-flag="AI Alert" role="button">
 <div class="w-2 h-2 rounded-full bg-orange-500"></div>
-<span class="text-xs font-medium text-gray-700">AI Alert</span>
+<span class="text-xs font-medium text-gray-700">AI分類警示</span>
 </label>
 <label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer select-none" data-flag="PLT Check" role="button">
 <div class="w-2 h-2 rounded-full bg-blue-500"></div>
-<span class="text-xs font-medium text-gray-700">PLT Check</span>
+<span class="text-xs font-medium text-gray-700">血小板確認</span>
 </label>
 <label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer select-none" data-flag="Follow-up" role="button">
 <div class="w-2 h-2 rounded-full bg-red-500"></div>
-<span class="text-xs font-medium text-gray-700">Follow-up</span>
-</label>
-<label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer select-none" data-flag="Manual Alert" role="button">
-<div class="w-2 h-2 rounded-full bg-amber-500"></div>
-<span class="text-xs font-medium text-gray-700">Manual Alert</span>
+<span class="text-xs font-medium text-gray-700">需拉片確認</span>
 </label>
 <label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer select-none" data-flag="Digital Review" role="button">
 <div class="w-2 h-2 rounded-full bg-purple-500"></div>
-<span class="text-xs font-medium text-gray-700">Digital Review</span>
+<span class="text-xs font-medium text-gray-700">數位閱片</span>
 </label>
 </div>
 </div>
@@ -291,7 +287,7 @@
 <button type="button" class="menu-item-danger" data-category="Blast">Blast</button>
 <button type="button" class="menu-item-danger" data-category="Hypersegmented">Hyperseg.</button>
 <button type="button" class="menu-item-danger" data-category="Promyelocyte">Promyelocyte</button>
-<button type="button" class="menu-item-danger" data-category="Abnormal Lymphocyte">Aty-Lym</button>
+<button type="button" class="menu-item-danger" data-category="Atypical Lymphocyte">Aty-Lym</button>
 <button type="button" class="menu-item-danger" data-category="Myelocyte">Myelocyte</button>
 <button type="button" class="menu-item-danger" data-category="Megakaryocyte">Megakaryo</button>
 </div>
@@ -312,10 +308,11 @@
 </details>
 </div>
 </div>
-<script src="assets/data/database.js?v=20260411b"></script>
-<script src="assets/js/common.js?v=20260411d"></script>
-<script src="assets/js/tutorial.js?v=20260411g"></script>
-<script src="assets/js/image-review.js?v=20260411g"></script>
+<script src="assets/data/database.js?v=20260531j"></script>
+<script src="assets/data/cell-sample-images.js?v=20260531j"></script>
+<script src="assets/js/common.js?v=20260531j"></script>
+<script src="assets/js/tutorial.js?v=20260530b"></script>
+<script src="assets/js/image-review.js?v=20260531j"></script>
 <script>
     function toggleGrid(headerEl) {
       var card = headerEl && headerEl.closest ? headerEl.closest('.group') : (headerEl && headerEl.parentElement);
