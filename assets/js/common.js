@@ -169,6 +169,17 @@ function parseMetricNum(v) {
   return isNaN(n) ? null : n;
 }
 
+/** 流式計數欄顯示值（與檢體管理一致：成熟細胞取自 flowCyt，未成熟/異常細胞一律 '-'） */
+function getFlowCytMetricValue(spec, key) {
+  if (!spec) return '-';
+  if (key === 'wbc' || key === 'plt') {
+    var m = spec.metrics || {};
+    return m[key] != null && m[key] !== '' ? m[key] : '-';
+  }
+  var f = spec.flowCyt || {};
+  return f[key] !== undefined ? f[key] : '-';
+}
+
 function isAbnormalMetricValue(key, value) {
   var th = LEAVE_THRESHOLDS[key];
   if (th == null) return false;
@@ -330,22 +341,19 @@ function markFollowUpReviewDone(specimenId) {
   if (!spec || !Array.isArray(spec.status) || spec.status.indexOf('Follow-up') === -1) return false;
   if (typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(spec, 'Follow-up')) return true;
   if (!spec.workflowDone || typeof spec.workflowDone !== 'object') {
-    spec.workflowDone = { digitalReview: false, entityReview: false, entityStatusDone: {} };
+    spec.workflowDone = { digitalReview: false, digitalReviewSignedOff: false, aiAlertConfirmed: false, entityReview: false, entityStatusDone: {} };
   }
   if (!spec.workflowDone.entityStatusDone || typeof spec.workflowDone.entityStatusDone !== 'object') {
     spec.workflowDone.entityStatusDone = {};
   }
   spec.workflowDone.entityStatusDone['Follow-up'] = true;
-  /** AI+需拉片雙旗標：拉片完成視同已確認 AI 警示，一併綠勾並可整筆結案 */
+  /** AI+需拉片雙旗標：拉片完成時一併確認 AI（數位欄位） */
   if (typeof isAiAlertAndFollowUpSpecimen === 'function' && isAiAlertAndFollowUpSpecimen(spec) && spec.status.indexOf('AI Alert') !== -1) {
-    spec.workflowDone.entityStatusDone['AI Alert'] = true;
+    spec.workflowDone.aiAlertConfirmed = true;
   }
-  var entityStatuses = spec.status.filter(function (x) {
-    return ENTITY_REVIEW_STATUS_SET.indexOf(x) !== -1;
-  });
-  spec.workflowDone.entityReview = entityStatuses.length > 0 && entityStatuses.every(function (k) {
-    return !!spec.workflowDone.entityStatusDone[k];
-  });
+  spec.workflowDone.entityReview = typeof recomputeEntityReviewFromStatus === 'function'
+    ? recomputeEntityReviewFromStatus(spec.status, spec.workflowDone.entityStatusDone)
+    : false;
   spec.statusDone = typeof computeSpecimenStatusDoneFromWorkflow === 'function'
     ? computeSpecimenStatusDoneFromWorkflow(spec.status, spec.workflowDone)
     : false;
@@ -408,14 +416,26 @@ function reopenDigitalReview(specimenId) {
   if (!specimenId || typeof getSpecimenById !== 'function') return false;
   var spec = getSpecimenById(specimenId);
   if (!spec) return false;
-  if (!spec.workflowDone || typeof spec.workflowDone !== 'object') spec.workflowDone = { digitalReview: false, entityReview: false, entityStatusDone: {} };
+  if (!spec.workflowDone || typeof spec.workflowDone !== 'object') spec.workflowDone = { digitalReview: false, digitalReviewSignedOff: false, entityReview: false, entityStatusDone: {} };
   spec.workflowDone.digitalReview = false;
+  spec.workflowDone.digitalReviewSignedOff = false;
   spec.statusDone = computeSpecimenStatusDoneFromWorkflow(spec.status, spec.workflowDone);
   spec.editor = '';
+  if (typeof clearEditedCellsSnapshot === 'function') {
+    clearEditedCellsSnapshot(specimenId);
+  }
   if (typeof persistSpecimenStatusOverride === 'function') {
     persistSpecimenStatusOverride(specimenId, spec.status, { workflowDone: spec.workflowDone, editor: '' });
   }
   return true;
+}
+
+/** 改為人工鏡檢交接後、待拉片：數位已完成但未簽核結案 */
+function isDigitalReviewHandoffToFollowUp(spec) {
+  if (!spec) return false;
+  var wf = normalizeWorkflowDone(spec.workflowDone, spec.statusDone);
+  if (!wf.digitalReview || wf.digitalReviewSignedOff) return false;
+  return typeof needsPendingFollowUpReview === 'function' && needsPendingFollowUpReview(spec);
 }
 
 // 導向報告核發頁（可帶檢體 ID）
@@ -481,16 +501,21 @@ function migrateLegacyManualAlertStatus(statusArr) {
 }
 
 function migrateLegacyEntityStatusDone(entityStatusDone) {
-  if (!entityStatusDone || typeof entityStatusDone !== 'object') return {};
-  var out = {};
+  if (!entityStatusDone || typeof entityStatusDone !== 'object') return { entity: {}, legacyAiAlert: false };
+  var entity = {};
+  var legacyAiAlert = false;
   Object.keys(entityStatusDone).forEach(function (k) {
     if (k === 'Manual Alert') {
-      if (out['Follow-up'] === undefined) out['Follow-up'] = !!entityStatusDone[k];
+      if (entity['Follow-up'] === undefined) entity['Follow-up'] = !!entityStatusDone[k];
       return;
     }
-    out[k] = !!entityStatusDone[k];
+    if (k === 'AI Alert') {
+      legacyAiAlert = legacyAiAlert || !!entityStatusDone[k];
+      return;
+    }
+    entity[k] = !!entityStatusDone[k];
   });
-  return out;
+  return { entity: entity, legacyAiAlert: legacyAiAlert };
 }
 
 // 模式預設勾選的狀態（數位閱片 / 實體作業）
@@ -515,7 +540,7 @@ function hasPendingDigitalReviewWork(spec) {
     return typeof isDigitalReviewDone === 'function' && !isDigitalReviewDone(spec);
   }
   if (st.indexOf('AI Alert') >= 0 && matchesAiAlertForDigitalList(spec)) {
-    return typeof isEntityStatusCompleted === 'function' && !isEntityStatusCompleted(spec, 'AI Alert');
+    return typeof isAiAlertConfirmed === 'function' && !isAiAlertConfirmed(spec);
   }
   return false;
 }
@@ -538,7 +563,7 @@ function matchesAiAlertForDigitalList(spec) {
 }
 
 /**
- * 報告端「改為人工鏡檢」：將 AI分類警示標為已確認（綠勾）；若尚無需拉片確認則加入。
+ * 報告端「改為人工鏡檢」：數位閱片標完成；AI 若有則確認；加入需拉片確認待辦。
  */
 function buildWorkflowDoneAfterManualFollowUpFromReport(spec, statusArr) {
   var wf = normalizeWorkflowDone(spec && spec.workflowDone, spec && spec.statusDone);
@@ -549,23 +574,36 @@ function buildWorkflowDoneAfterManualFollowUpFromReport(spec, statusArr) {
     }
   });
   var st = Array.isArray(statusArr) ? statusArr : (spec && spec.status) || [];
+  var aiAlertConfirmed = !!wf.aiAlertConfirmed;
   if (st.indexOf('AI Alert') !== -1) {
-    entityStatusDone['AI Alert'] = true;
+    aiAlertConfirmed = true;
   }
   if (st.indexOf('Follow-up') !== -1) {
     entityStatusDone['Follow-up'] = false;
   }
   return {
-    digitalReview: !!wf.digitalReview,
+    digitalReview: true,
+    digitalReviewSignedOff: false,
+    aiAlertConfirmed: aiAlertConfirmed,
     entityReview: false,
     entityStatusDone: entityStatusDone
   };
 }
 
+function recomputeEntityReviewFromStatus(statusArr, entityStatusDone) {
+  var entityStatuses = (statusArr || []).filter(function (x) {
+    return ENTITY_REVIEW_STATUS_SET.indexOf(x) !== -1;
+  });
+  if (entityStatuses.length === 0) return true;
+  return entityStatuses.every(function (k) {
+    return entityStatusDone && entityStatusDone[k] === true;
+  });
+}
+
 /**
- * 報告簽核完成：
- * - 原本即有 Digital Review：標記數位閱片完成。
- * - 僅 AI Alert、綠色橫幅誤報排除（dismissAiAlertOnVerify）：AI 綠勾，並「新增」數位閱片膠囊且綠勾（表示以數位流程直接結案）。
+ * 報告簽核完成（數位流程）：
+ * - confirmAiOnVerify：綠／黃橫幅簽核 → aiAlertConfirmed；僅 AI 時補 Digital Review 膠囊
+ * - forceUnlockSignOff：開鎖強制簽核 → 確認 AI；有待拉片則一併標完成；補數位閱片綠勾膠囊
  */
 function buildWorkflowDoneOnReportVerified(spec, options) {
   options = options || {};
@@ -578,58 +616,120 @@ function buildWorkflowDoneOnReportVerified(spec, options) {
   });
   var st = spec && Array.isArray(spec.status) ? spec.status.slice().filter(function (x) { return x !== 'Verified'; }) : [];
   var hadDigitalReview = st.indexOf('Digital Review') !== -1;
+  var confirmAi = !!(options.confirmAiOnVerify || options.forceUnlockSignOff);
 
-  if (hadDigitalReview) {
+  if (hadDigitalReview || confirmAi || options.forceUnlockSignOff) {
     wf.digitalReview = true;
+    wf.digitalReviewSignedOff = true;
   }
 
-  if (options.dismissAiAlertOnVerify) {
-    if (st.indexOf('AI Alert') !== -1) {
-      entityStatusDone['AI Alert'] = true;
-    }
-    if (!hadDigitalReview) {
-      st.push('Digital Review');
-      wf.digitalReview = true;
-    }
+  if (confirmAi && st.indexOf('AI Alert') !== -1) {
+    wf.aiAlertConfirmed = true;
   }
 
-  var entityStatuses = st.filter(function (x) {
-    return ENTITY_REVIEW_STATUS_SET.indexOf(x) !== -1;
-  });
-  wf.entityReview = entityStatuses.length === 0 || entityStatuses.every(function (k) {
-    return entityStatusDone[k] === true;
-  });
+  if (options.forceUnlockSignOff && st.indexOf('Follow-up') !== -1) {
+    entityStatusDone['Follow-up'] = true;
+  }
+
+  /** 簽核完成數位流程時補上數位閱片膠囊（含僅需拉片、開鎖強制簽核等情境） */
+  if (wf.digitalReview && st.indexOf('Digital Review') === -1) {
+    st.push('Digital Review');
+  }
+
+  wf.entityReview = recomputeEntityReviewFromStatus(st, entityStatusDone);
   wf.entityStatusDone = entityStatusDone;
   return { status: st, workflowDone: wf };
 }
 
 /** 手動增刪 flag／簽核完成狀態覆寫（新版：status + workflowDone） */
 var APP_SPECIMEN_STATUS_STORAGE_KEY = 'blood-morphology-specimen-status';
-var ENTITY_REVIEW_STATUS_SET = ['PLT Check', 'Follow-up', 'AI Alert'];
+/** 數位閱片人員編輯之細胞分類快照（Demo：localStorage） */
+var APP_EDITED_CELLS_STORAGE_PREFIX = 'editedCells:';
+var APP_EDITED_METRICS_STORAGE_PREFIX = 'editedMetrics:';
+/** 實體作業膠囊（不含 AI Alert；AI 完成記於 workflowDone.aiAlertConfirmed） */
+var ENTITY_REVIEW_STATUS_SET = ['PLT Check', 'Follow-up'];
+
+function persistEditedCellsSnapshot(specimenId, cells) {
+  if (!specimenId || !Array.isArray(cells) || cells.length === 0) return;
+  try {
+    localStorage.setItem(APP_EDITED_CELLS_STORAGE_PREFIX + specimenId, JSON.stringify(cells));
+  } catch (e) {}
+}
+
+function loadEditedCellsSnapshot(specimenId) {
+  if (!specimenId) return null;
+  try {
+    var raw = localStorage.getItem(APP_EDITED_CELLS_STORAGE_PREFIX + specimenId);
+    if (!raw) return null;
+    var parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearEditedCellsSnapshot(specimenId) {
+  if (!specimenId) return;
+  try {
+    localStorage.removeItem(APP_EDITED_CELLS_STORAGE_PREFIX + specimenId);
+    localStorage.removeItem(APP_EDITED_METRICS_STORAGE_PREFIX + specimenId);
+  } catch (e) {}
+}
+
+/** 登入重設 Demo 時清除所有檢體編輯快照 */
+function clearAllSpecimenEditSnapshotsFromStorage() {
+  try {
+    var keys = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (!k) continue;
+      if (k.indexOf(APP_EDITED_CELLS_STORAGE_PREFIX) === 0 || k.indexOf(APP_EDITED_METRICS_STORAGE_PREFIX) === 0) {
+        keys.push(k);
+      }
+    }
+    keys.forEach(function (k) { localStorage.removeItem(k); });
+  } catch (e) {}
+}
 
 function normalizeWorkflowDone(rawWorkflow, rawStatusDone) {
   var digitalReview = false;
+  var digitalReviewSignedOff = false;
+  var aiAlertConfirmed = false;
   var entityReview = false;
   var entityStatusDone = {};
   if (rawWorkflow && typeof rawWorkflow === 'object') {
     digitalReview = !!rawWorkflow.digitalReview;
+    if (rawWorkflow.digitalReviewSignedOff !== undefined) {
+      digitalReviewSignedOff = !!rawWorkflow.digitalReviewSignedOff;
+    } else if (digitalReview) {
+      digitalReviewSignedOff = true;
+    }
+    aiAlertConfirmed = !!rawWorkflow.aiAlertConfirmed;
     entityReview = !!rawWorkflow.entityReview;
     if (rawWorkflow.entityStatusDone && typeof rawWorkflow.entityStatusDone === 'object') {
-      var migratedDone = migrateLegacyEntityStatusDone(rawWorkflow.entityStatusDone);
+      var migrated = migrateLegacyEntityStatusDone(rawWorkflow.entityStatusDone);
+      if (migrated.legacyAiAlert) aiAlertConfirmed = true;
       ENTITY_REVIEW_STATUS_SET.forEach(function (k) {
-        if (migratedDone[k] !== undefined) {
-          entityStatusDone[k] = !!migratedDone[k];
+        if (migrated.entity[k] !== undefined) {
+          entityStatusDone[k] = !!migrated.entity[k];
         }
       });
     }
   }
   if (rawStatusDone) {
-    // 舊版 statusDone 視為整體完成，兩條流程都視為已完成
     digitalReview = true;
+    digitalReviewSignedOff = true;
+    aiAlertConfirmed = true;
     entityReview = true;
     ENTITY_REVIEW_STATUS_SET.forEach(function (k) { entityStatusDone[k] = true; });
   }
-  return { digitalReview: digitalReview, entityReview: entityReview, entityStatusDone: entityStatusDone };
+  return {
+    digitalReview: digitalReview,
+    digitalReviewSignedOff: digitalReviewSignedOff,
+    aiAlertConfirmed: aiAlertConfirmed,
+    entityReview: entityReview,
+    entityStatusDone: entityStatusDone
+  };
 }
 
 function normalizeStatusStorageEntry(raw) {
@@ -668,6 +768,30 @@ function isDigitalReviewDone(spec) {
   if (!hasStatus(spec, 'Digital Review')) return true;
   var wf = normalizeWorkflowDone(spec.workflowDone, spec.statusDone);
   return !!wf.digitalReview;
+}
+
+/** 閱片頁／列表唯讀：已簽核結案，或改為人工鏡檢交接後之編輯快照 */
+function isDigitalReviewReadOnly(spec) {
+  if (!spec) return false;
+  if (spec.locked) return true;
+  var wf = normalizeWorkflowDone(spec.workflowDone, spec.statusDone);
+  if (!wf.digitalReview) return false;
+  if (wf.digitalReviewSignedOff) return true;
+  return typeof isDigitalReviewHandoffToFollowUp === 'function' && isDigitalReviewHandoffToFollowUp(spec);
+}
+
+/** AI 分類警示是否已確認（數位流程） */
+function isAiAlertConfirmed(spec) {
+  if (!spec) return false;
+  if (!hasStatus(spec, 'AI Alert')) return true;
+  var wf = normalizeWorkflowDone(spec.workflowDone, spec.statusDone);
+  return !!wf.aiAlertConfirmed;
+}
+
+/** 數位流程完成：數位閱片（若有）＋ AI 警示（若有） */
+function isDigitalWorkflowDone(spec) {
+  if (!spec) return false;
+  return isDigitalReviewDone(spec) && isAiAlertConfirmed(spec);
 }
 
 function isEntityReviewDone(spec) {
@@ -726,6 +850,8 @@ function persistSpecimenStatusOverride(specimenId, statusArray, options) {
       }
       workflowInput = {
         digitalReview: options.workflowDone.digitalReview !== undefined ? options.workflowDone.digitalReview : prev.workflowDone.digitalReview,
+        digitalReviewSignedOff: options.workflowDone.digitalReviewSignedOff !== undefined ? options.workflowDone.digitalReviewSignedOff : prev.workflowDone.digitalReviewSignedOff,
+        aiAlertConfirmed: options.workflowDone.aiAlertConfirmed !== undefined ? options.workflowDone.aiAlertConfirmed : prev.workflowDone.aiAlertConfirmed,
         entityReview: options.workflowDone.entityReview !== undefined ? options.workflowDone.entityReview : prev.workflowDone.entityReview,
         entityStatusDone: nextEntityStatusDone
       };
@@ -785,18 +911,17 @@ function getCurrentUserAccount() {
  */
 function isSpecimenWorkflowCompleted(spec) {
   if (!spec) return false;
-  return isDigitalReviewDone(spec) && isEntityReviewDone(spec);
+  return isDigitalWorkflowDone(spec) && isEntityReviewDone(spec);
 }
 
 /**
- * 與 isSpecimenWorkflowCompleted 一致地計算 statusDone（不依賴「兩個 workflow 旗標必須皆為 true」）。
- * 例如：僅 AI Alert 時不需數位閱片；僅 Digital Review 時不需實體膠囊。
+ * 與 isSpecimenWorkflowCompleted 一致地計算 statusDone。
  * 評估時傳入 statusDone: false，避免舊版 statusDone 旗標干擾 normalize。
  */
 function computeSpecimenStatusDoneFromWorkflow(statusArr, workflowDoneObj) {
   return isSpecimenWorkflowCompleted({
     status: Array.isArray(statusArr) ? statusArr.slice() : [],
-    workflowDone: workflowDoneObj || { digitalReview: false, entityReview: false, entityStatusDone: {} },
+    workflowDone: workflowDoneObj || { digitalReview: false, digitalReviewSignedOff: false, aiAlertConfirmed: false, entityReview: false, entityStatusDone: {} },
     statusDone: false
   });
 }

@@ -74,7 +74,7 @@
     }
 
     function addRow(rowLabel, key) {
-      var flow = metrics[key] || '-';
+      var flow = getFlowCytMetricValue(spec, key);
       var ai = metrics[key] || '-';
       // 人員編輯：若有人工編輯結果，優先顯示；否則退回原始 metrics
       var edited = editedMetrics[key] != null ? editedMetrics[key] : (metrics[key] || '-');
@@ -157,16 +157,25 @@
 
   function isAiAlertPendingConfirmation(spec) {
     if (!specimenHasAiAlert(spec)) return false;
-    if (typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(spec, 'AI Alert')) return false;
+    if (typeof isAiAlertConfirmed === 'function' && isAiAlertConfirmed(spec)) return false;
     return true;
   }
 
   function shouldShowManualReviewFromReportBtn(spec) {
-    if (!isAiAlertPendingConfirmation(spec)) return false;
+    if (!spec) return false;
     var effective = getEffectiveMetricsForRisk(spec);
     var risk = getRiskState(spec, effective);
-    /** 綠色／黃色（人員編輯後未達留單）：誤報排除，不需「改為人工鏡檢」 */
-    return !!risk.hasNewLeave;
+    /** 僅紅色橫幅（新發留單）時提供「改為人工鏡檢」 */
+    if (!risk.hasNewLeave) return false;
+    /** 已有待辦需拉片：改點「已拉片完成」，不重複顯示 */
+    if (typeof needsPendingFollowUpReview === 'function' && needsPendingFollowUpReview(spec)) return false;
+    var st = spec.status || [];
+    /** 數位閱片尚未完成（含僅 Digital Review） */
+    if (st.indexOf('Digital Review') !== -1) {
+      return typeof isDigitalReviewDone === 'function' ? !isDigitalReviewDone(spec) : true;
+    }
+    /** 僅 AI Alert、待確認 */
+    return isAiAlertPendingConfirmation(spec);
   }
 
   function addFollowUpForManualReviewFromReport(spec) {
@@ -174,7 +183,7 @@
     if (!Array.isArray(spec.status)) spec.status = [];
     var hadFollowUp = spec.status.indexOf('Follow-up') !== -1;
     var st = spec.status.slice();
-    st = st.filter(function (s) { return s !== 'Digital Review'; });
+    if (st.indexOf('Digital Review') === -1) st.push('Digital Review');
     if (!hadFollowUp && st.indexOf('Follow-up') === -1) st.push('Follow-up');
     if (typeof migrateLegacyManualAlertStatus === 'function') {
       st = migrateLegacyManualAlertStatus(st);
@@ -231,7 +240,7 @@
     OTHER_ROWS.forEach(function (r) {
       var label = r[0];
       var key = r[1];
-      var flow = metrics[key] || '-';
+      var flow = getFlowCytMetricValue(spec, key);
       var ai = metrics[key] || '-';
       // 其他發現的人員編輯欄位，同樣優先採用 editedMetrics
       var edited = editedMetrics[key] != null ? editedMetrics[key] : (metrics[key] || '-');
@@ -287,11 +296,14 @@
         var style = 'bg-gray-100 text-gray-800';
         var label = typeof getStatusDisplayLabel === 'function' ? getStatusDisplayLabel(s) : s;
         var prefixIcon = '';
-        if (s === 'AI Alert' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(spec, 'AI Alert')) {
+        if (s === 'AI Alert' && typeof isAiAlertConfirmed === 'function' && isAiAlertConfirmed(spec)) {
           style = 'bg-green-100 text-green-800';
           prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
         } else if (s === 'AI Alert' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['AI Alert'] || style;
-        else if (s === 'PLT Check' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['PLT Check'] || style;
+        else if (s === 'PLT Check' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(spec, 'PLT Check')) {
+          style = 'bg-green-100 text-green-800';
+          prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
+        } else if (s === 'PLT Check' && typeof STATUS_STYLES !== 'undefined') style = STATUS_STYLES['PLT Check'] || style;
         else if (s === 'Follow-up' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(spec, 'Follow-up')) {
           style = 'bg-green-100 text-green-800';
           prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
@@ -325,7 +337,10 @@
       verifyUnlockSpecimenId = sid;
     }
     var pendingFollowUp = typeof needsPendingFollowUpReview === 'function' && needsPendingFollowUpReview(spec);
-    var signOffBlocked = pendingFollowUp && !verifySignOffUnlocked;
+    var effective = typeof getEffectiveMetricsForRisk === 'function' ? getEffectiveMetricsForRisk(spec) : {};
+    var risk = typeof getRiskState === 'function' ? getRiskState(spec, effective) : { hasNewLeave: false };
+    var signOffBlocked = (pendingFollowUp || !!risk.hasNewLeave) && !verifySignOffUnlocked;
+    var showLock = pendingFollowUp || !!risk.hasNewLeave;
     var confirmBtn = document.getElementById('confirm-btn');
     var lockBtn = document.getElementById('verify-lock-btn');
     var lockIcon = document.getElementById('verify-lock-icon');
@@ -336,21 +351,21 @@
       confirmBtn.classList.toggle('opacity-50', !!signOffBlocked);
       confirmBtn.classList.toggle('cursor-not-allowed', !!signOffBlocked);
       confirmBtn.classList.toggle('pointer-events-none', !!signOffBlocked);
-      confirmBtn.title = signOffBlocked ? '尚有需拉片確認未完成，請開鎖或先點「已拉片完成」' : '';
+      confirmBtn.title = signOffBlocked ? '尚有需拉片或未解除紅色留單鎖定，請開鎖或先完成拉片' : '';
     }
     if (lockBtn) {
-      lockBtn.classList.toggle('hidden', !pendingFollowUp);
-      lockBtn.setAttribute('aria-hidden', pendingFollowUp ? 'false' : 'true');
-      if (pendingFollowUp) {
+      lockBtn.classList.toggle('hidden', !showLock);
+      lockBtn.setAttribute('aria-hidden', showLock ? 'false' : 'true');
+      if (showLock) {
         if (verifySignOffUnlocked) {
           lockBtn.classList.remove('bg-zinc-200', 'border-zinc-300', 'text-zinc-600');
           lockBtn.classList.add('bg-amber-50', 'border-amber-400', 'text-amber-800');
-          lockBtn.title = '已開鎖，可簽核（需拉片確認尚未標記完成）；點擊可重新上鎖';
+          lockBtn.title = '已開鎖，可強制簽核（略過拉片／不補需拉片）';
           lockBtn.setAttribute('aria-label', '已開鎖，點擊重新上鎖');
         } else {
           lockBtn.classList.add('bg-zinc-200', 'border-zinc-300', 'text-zinc-600');
           lockBtn.classList.remove('bg-amber-50', 'border-amber-400', 'text-amber-800');
-          lockBtn.title = '點擊開鎖後可進行簽核；建議先點「已拉片完成」';
+          lockBtn.title = risk.hasNewLeave ? '紅色留單：點擊開鎖後可強制數位簽核' : '點擊開鎖後可強制簽核（略過需拉片）';
           lockBtn.setAttribute('aria-label', '點擊開鎖簽核');
         }
         if (lockIcon) lockIcon.textContent = verifySignOffUnlocked ? 'lock_open' : 'lock';
@@ -404,25 +419,35 @@
       confirmBtn.addEventListener('click', function () {
         var s = getSpecimen();
         if (s && typeof needsPendingFollowUpReview === 'function' && needsPendingFollowUpReview(s) && !verifySignOffUnlocked) return;
+        if (s) {
+          var effectiveSign = getEffectiveMetricsForRisk(s);
+          var riskSign = getRiskState(s, effectiveSign);
+          if (riskSign.hasNewLeave && !verifySignOffUnlocked) return;
+        }
         var sid = s ? s.id : '';
         var navigateNextDigitalReview = false;
-        var dismissAiAlertOnVerify = false;
+        var confirmAiOnVerify = false;
+        var forceUnlockSignOff = !!verifySignOffUnlocked;
         if (s) {
           var effective = getEffectiveMetricsForRisk(s);
           var risk = getRiskState(s, effective);
           navigateNextDigitalReview = !risk.hasNewLeave;
-          dismissAiAlertOnVerify = specimenHasAiAlert(s) && !risk.hasNewLeave && !risk.hasLeaveNow;
+          confirmAiOnVerify = specimenHasAiAlert(s) && !risk.hasNewLeave;
         }
         if (window.self !== window.top && window.parent) {
           window.parent.postMessage({
             type: 'reportVerified',
             specimenId: sid,
             navigateNextDigitalReview: navigateNextDigitalReview,
-            dismissAiAlertOnVerify: dismissAiAlertOnVerify
+            confirmAiOnVerify: confirmAiOnVerify,
+            forceUnlockSignOff: forceUnlockSignOff
           }, '*');
         } else if (typeof goToSpecimenList === 'function') {
           if (s && typeof buildWorkflowDoneOnReportVerified === 'function' && typeof persistSpecimenStatusOverride === 'function') {
-            var built = buildWorkflowDoneOnReportVerified(s, { dismissAiAlertOnVerify: dismissAiAlertOnVerify });
+            var built = buildWorkflowDoneOnReportVerified(s, {
+              confirmAiOnVerify: confirmAiOnVerify,
+              forceUnlockSignOff: forceUnlockSignOff
+            });
             s.status = built.status;
             s.workflowDone = built.workflowDone;
             s.statusDone = typeof computeSpecimenStatusDoneFromWorkflow === 'function'
@@ -443,7 +468,11 @@
     if (verifyLockBtn) {
       verifyLockBtn.addEventListener('click', function () {
         var s = getSpecimen();
-        if (!s || typeof needsPendingFollowUpReview !== 'function' || !needsPendingFollowUpReview(s)) return;
+        if (!s || typeof needsPendingFollowUpReview !== 'function') return;
+        var effectiveLock = getEffectiveMetricsForRisk(s);
+        var riskLock = getRiskState(s, effectiveLock);
+        var needsLock = needsPendingFollowUpReview(s) || !!riskLock.hasNewLeave;
+        if (!needsLock) return;
         verifySignOffUnlocked = !verifySignOffUnlocked;
         applyReportFooterActions(s);
       });
@@ -469,7 +498,7 @@
     if (manualAlertBtn) {
       manualAlertBtn.addEventListener('click', function () {
         var s = getSpecimen();
-        if (!s || !isAiAlertPendingConfirmation(s)) return;
+        if (!s || !shouldShowManualReviewFromReportBtn(s)) return;
         var result = addFollowUpForManualReviewFromReport(s);
         var addedFollowUp = !!(result && result.addedFollowUp);
         refreshReportFromParent();

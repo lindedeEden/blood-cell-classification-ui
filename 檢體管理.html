@@ -231,8 +231,8 @@
     <button type="button" id="specimen-ctx-reopen-dr" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-text-light text-xs font-medium">退回 Digital Review</button>
   </div>
 
-  <script src="assets/data/database.js?v=20260531k"></script>
-  <script src="assets/js/common.js?v=20260531k"></script>
+  <script src="assets/data/database.js?v=20260601f"></script>
+  <script src="assets/js/common.js?v=20260601f"></script>
   <script src="assets/js/tutorial.js?v=20260411d"></script>
   <script>
     (function () {
@@ -414,11 +414,11 @@
           if (statusKey === 'Digital Review' && typeof isDigitalReviewDone === 'function') {
             return !isDigitalReviewDone(specimen);
           }
-          if (statusKey === 'AI Alert' && currentMode === 'digital') {
-            return typeof matchesAiAlertForDigitalList === 'function' ? matchesAiAlertForDigitalList(specimen) : hasTag;
+          if (statusKey === 'AI Alert') {
+            return typeof isAiAlertConfirmed === 'function' ? !isAiAlertConfirmed(specimen) : hasTag;
           }
           if (typeof isEntityStatusCompleted === 'function' &&
-              (statusKey === 'PLT Check' || statusKey === 'Follow-up' || statusKey === 'AI Alert')) {
+              (statusKey === 'PLT Check' || statusKey === 'Follow-up')) {
             return !isEntityStatusCompleted(specimen, statusKey);
           }
           return true;
@@ -504,10 +504,11 @@
           if (st === 'Verified') return;
           var style = STATUS_STYLES[st] || 'bg-gray-100 text-gray-800';
           var drCompleted = st === 'Digital Review' && typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(specimen);
-          var entityCompleted = typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(specimen, st);
-          if (drCompleted || entityCompleted) style = 'bg-green-100 text-green-800';
+          var aiCompleted = st === 'AI Alert' && typeof isAiAlertConfirmed === 'function' && isAiAlertConfirmed(specimen);
+          var entityCompleted = st !== 'AI Alert' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(specimen, st);
+          if (drCompleted || aiCompleted || entityCompleted) style = 'bg-green-100 text-green-800';
           html += '<span class="status-capsule ' + style + '" data-status="' + st + '">';
-          if (drCompleted || entityCompleted) html += '<span class="material-symbols-outlined text-xs mr-1">check</span>';
+          if (drCompleted || aiCompleted || entityCompleted) html += '<span class="material-symbols-outlined text-xs mr-1">check</span>';
           if (st === 'Locked') html += '<span class="material-symbols-outlined text-xs mr-1">lock</span>';
           var displayLabel = typeof getStatusDisplayLabel === 'function' ? getStatusDisplayLabel(st) : st;
           html += displayLabel + '</span>';
@@ -530,11 +531,11 @@
           tr.className = 'hover:bg-gray-50 ' + rowClass(s, i);
           tr.dataset.specimenId = s.id;
           var stList = s.status || [];
-          var drCompleted = !s.locked && stList.indexOf('Digital Review') >= 0 && typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(s);
-          var enterDisabled = (s.locked || drCompleted) ? ' disabled' : '';
+          var drReadOnly = !s.locked && typeof isDigitalReviewReadOnly === 'function' && isDigitalReviewReadOnly(s);
+          var enterDisabled = (s.locked || drReadOnly) ? ' disabled' : '';
           var enterText = s.locked ? '已鎖定' : '進入閱片';
-          var enterTitle = drCompleted ? ' title="數位閱片已完成"' : '';
-          var extraReadonly = drCompleted ? '<button type="button" class="readonly-review-btn text-amber-800 text-xs font-semibold hover:underline whitespace-nowrap" data-id="' + s.id + '">唯讀檢視</button>' : '';
+          var enterTitle = drReadOnly ? ' title="數位閱片已簽核結案"' : '';
+          var extraReadonly = drReadOnly ? '<button type="button" class="readonly-review-btn text-amber-800 text-xs font-semibold hover:underline whitespace-nowrap" data-id="' + s.id + '">唯讀檢視</button>' : '';
           tr.innerHTML =
             '<td class="p-2 py-4"><input type="checkbox" class="row-check rounded border-gray-300 text-primary focus:ring-primary" data-id="' + s.id + '"/></td>' +
             '<td class="p-2 py-4"><div class="flex flex-col gap-1 items-start">' + renderStatus(s) + '</div></td>' +
@@ -548,7 +549,7 @@
             '<td class="p-2 py-4">' + s.analysisTime + '</td>' +
             '<td class="p-2 py-4">' + (s.editor || '') + '</td>' +
             '<td class="p-2 py-4"><div class="flex flex-wrap items-center gap-2">' +
-            '<button type="button" class="text-primary text-xs hover:underline enter-review-btn' + (drCompleted ? ' opacity-50 cursor-not-allowed' : '') + '" data-id="' + s.id + '"' + enterDisabled + enterTitle + '>' + enterText + '</button>' +
+            '<button type="button" class="text-primary text-xs hover:underline enter-review-btn' + (drReadOnly ? ' opacity-50 cursor-not-allowed' : '') + '" data-id="' + s.id + '"' + enterDisabled + enterTitle + '>' + enterText + '</button>' +
             extraReadonly +
             '</div></td>';
           tbody.appendChild(tr);
@@ -566,8 +567,8 @@
             var spec = getSpecimenById(id);
             if (!id || !spec || spec.locked) return;
             var st = spec.status || [];
-            var drDone = st.indexOf('Digital Review') >= 0 && typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(spec);
-            if (drDone) return;
+            var drReadOnly = typeof isDigitalReviewReadOnly === 'function' && isDigitalReviewReadOnly(spec);
+            if (drReadOnly) return;
             goToImageReview(id);
           });
         });
@@ -597,9 +598,9 @@
           var specimen = specimenId ? getSpecimenById(specimenId) : null;
           if (!specimen || !statusKey) return;
           if (specimen.locked) return;
-          if (statusKey !== 'PLT Check' && statusKey !== 'Follow-up' && statusKey !== 'AI Alert') return;
+          if (statusKey !== 'PLT Check' && statusKey !== 'Follow-up') return;
           if (!specimen.workflowDone || typeof specimen.workflowDone !== 'object') {
-            specimen.workflowDone = { digitalReview: false, entityReview: false, entityStatusDone: {} };
+            specimen.workflowDone = { digitalReview: false, aiAlertConfirmed: false, entityReview: false, entityStatusDone: {} };
           }
           if (!specimen.workflowDone.entityStatusDone || typeof specimen.workflowDone.entityStatusDone !== 'object') {
             specimen.workflowDone.entityStatusDone = {};
@@ -607,12 +608,9 @@
           var beforeComplete = typeof isSpecimenWorkflowCompleted === 'function' ? isSpecimenWorkflowCompleted(specimen) : false;
           var current = !!specimen.workflowDone.entityStatusDone[statusKey];
           specimen.workflowDone.entityStatusDone[statusKey] = !current;
-          if (statusKey === 'Follow-up' && !current && typeof isAiAlertAndFollowUpSpecimen === 'function' && isAiAlertAndFollowUpSpecimen(specimen) && (specimen.status || []).indexOf('AI Alert') !== -1) {
-            specimen.workflowDone.entityStatusDone['AI Alert'] = true;
-          }
           var st = specimen.status || [];
           var entityStatuses = st.filter(function (x) {
-            return x === 'PLT Check' || x === 'Follow-up' || x === 'AI Alert';
+            return x === 'PLT Check' || x === 'Follow-up';
           });
           specimen.workflowDone.entityReview = entityStatuses.length > 0 && entityStatuses.every(function (x) {
             return !!specimen.workflowDone.entityStatusDone[x];

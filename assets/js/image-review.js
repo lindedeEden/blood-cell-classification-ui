@@ -98,9 +98,7 @@
     if (!spec) return !!getReadonlyFromUrl();
     if (getReadonlyFromUrl()) return true;
     if (spec.locked) return true;
-    var hasDR = (spec.status || []).indexOf('Digital Review') >= 0;
-    if (!hasDR) return false;
-    return typeof isDigitalReviewDone === 'function' && isDigitalReviewDone(spec);
+    return typeof isDigitalReviewReadOnly === 'function' && isDigitalReviewReadOnly(spec);
   }
 
   function applyReadOnlyChrome() {
@@ -112,8 +110,10 @@
       banner.classList.remove('hidden');
       if (currentSpecimen && currentSpecimen.locked) {
         banner.textContent = '此檢體已鎖定（他人編輯中），僅能檢視影像與縮放，無法變更細胞分類或核發報告。';
+      } else if (typeof isDigitalReviewHandoffToFollowUp === 'function' && isDigitalReviewHandoffToFollowUp(currentSpecimen)) {
+        banner.textContent = '唯讀模式：已交接至需拉片確認，以下為數位閱片人員編輯快照，僅供檢視。';
       } else {
-        banner.textContent = '唯讀模式：數位閱片已完成，僅能檢視影像與縮放，無法變更細胞分類或核發報告。';
+        banner.textContent = '唯讀模式：數位閱片已簽核結案，僅能檢視影像與縮放，無法變更細胞分類或核發報告。';
       }
     }
     var saveBtn = document.getElementById('btn-save-report');
@@ -141,7 +141,7 @@
       var done = typeof isDigitalReviewDone === 'function' ? isDigitalReviewDone(s) : !!s.statusDone;
       if (st.indexOf('Digital Review') >= 0 && !done) return true;
       if (st.indexOf('AI Alert') >= 0 && typeof matchesAiAlertForDigitalList === 'function' && matchesAiAlertForDigitalList(s)) {
-        if (typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(s, 'AI Alert')) return false;
+        if (typeof isAiAlertConfirmed === 'function' && isAiAlertConfirmed(s)) return false;
         return !done;
       }
       return false;
@@ -180,6 +180,10 @@
   }
 
   function getOrCreateCellData(specimenId) {
+    if (typeof loadEditedCellsSnapshot === 'function') {
+      var snapshot = loadEditedCellsSnapshot(specimenId);
+      if (snapshot && snapshot.length > 0) return snapshot.slice();
+    }
     var existing = window.CELLS_BY_SPECIMEN && window.CELLS_BY_SPECIMEN[specimenId];
     if (existing && Array.isArray(existing) && existing.length > 0) return existing.slice();
     var specimen = currentSpecimen;
@@ -270,28 +274,29 @@
     return prioritized.concat(rest);
   }
 
-  /** 與檢體管理介面相同：分析與歷史的列順序與標籤 */
+  /** 與檢體管理介面相同：分析與歷史的列順序與標籤；流式計數欄用 flowCyt */
   function getAnalysisTableRows(spec) {
     var m = spec.metrics || {};
     var prev = spec.prevReport || {};
+    var flow = function (key) { return getFlowCytMetricValue(spec, key); };
     return [
-      ['WBC (10e9/L)', m.wbc, '-', prev.wbc],
-      ['PLT (10e9/L)', m.plt, '-', prev.plt],
-      ['Band (%)', m.band, m.band, prev.band],
-      ['Segmented neutrophil (%)', m.segmentedNeutrophil, m.segmentedNeutrophil, prev.segmentedNeutrophil],
-      ['Eosinophil (%)', m.eosinophil, m.eosinophil, prev.eosinophil],
-      ['Monocyte (%)', m.monocyte, m.monocyte, prev.monocyte],
-      ['Basophil (%)', m.basophil, m.basophil, prev.basophil],
-      ['Lymphocyte (%)', m.lymphocyte, m.lymphocyte, prev.lymphocyte],
-      ['Atypical lymphocyte (%)', m.atypicalLymphocyte, m.atypicalLymphocyte, prev.atypicalLymphocyte],
-      ['Blast (%)', m.blast, m.blast, prev.blast],
-      ['Promyelocyte (%)', m.promyelocyte, m.promyelocyte, prev.promyelocyte],
-      ['Myelocyte (%)', m.myelocyte, m.myelocyte, prev.myelocyte],
-      ['Metamyelocyte (%)', m.metamyelocyte, m.metamyelocyte, prev.metamyelocyte],
-      ['Hypersegmented (%)', m.hypersegmented, m.hypersegmented, prev.hypersegmented],
-      ['Promonocyte (%)', m.promonocyte, m.promonocyte, prev.promonocyte],
-      ['Plasma cell (%)', m.plasmaCell, m.plasmaCell, prev.plasmaCell],
-      ['Abnormal lymphocyte (%)', m.abnormalLymphocyte, m.abnormalLymphocyte, prev.abnormalLymphocyte]
+      ['WBC (10e9/L)', flow('wbc'), m.wbc, prev.wbc],
+      ['PLT (10e9/L)', flow('plt'), m.plt, prev.plt],
+      ['Band (%)', flow('band'), m.band, prev.band],
+      ['Segmented neutrophil (%)', flow('segmentedNeutrophil'), m.segmentedNeutrophil, prev.segmentedNeutrophil],
+      ['Eosinophil (%)', flow('eosinophil'), m.eosinophil, prev.eosinophil],
+      ['Monocyte (%)', flow('monocyte'), m.monocyte, prev.monocyte],
+      ['Basophil (%)', flow('basophil'), m.basophil, prev.basophil],
+      ['Lymphocyte (%)', flow('lymphocyte'), m.lymphocyte, prev.lymphocyte],
+      ['Atypical lymphocyte (%)', flow('atypicalLymphocyte'), m.atypicalLymphocyte, prev.atypicalLymphocyte],
+      ['Blast (%)', flow('blast'), m.blast, prev.blast],
+      ['Promyelocyte (%)', flow('promyelocyte'), m.promyelocyte, prev.promyelocyte],
+      ['Myelocyte (%)', flow('myelocyte'), m.myelocyte, prev.myelocyte],
+      ['Metamyelocyte (%)', flow('metamyelocyte'), m.metamyelocyte, prev.metamyelocyte],
+      ['Hypersegmented (%)', flow('hypersegmented'), m.hypersegmented, prev.hypersegmented],
+      ['Promonocyte (%)', flow('promonocyte'), m.promonocyte, prev.promonocyte],
+      ['Plasma cell (%)', flow('plasmaCell'), m.plasmaCell, prev.plasmaCell],
+      ['Abnormal lymphocyte (%)', flow('abnormalLymphocyte'), m.abnormalLymphocyte, prev.abnormalLymphocyte]
     ];
   }
 
@@ -341,7 +346,7 @@
         var style;
         var label = typeof getStatusDisplayLabel === 'function' ? getStatusDisplayLabel(s) : s;
         var prefixIcon = '';
-        if (s === 'AI Alert' && typeof isEntityStatusCompleted === 'function' && isEntityStatusCompleted(specimen, 'AI Alert')) {
+        if (s === 'AI Alert' && typeof isAiAlertConfirmed === 'function' && isAiAlertConfirmed(specimen)) {
           style = 'bg-green-100 text-green-800';
           prefixIcon = '<span class="material-symbols-outlined text-[14px] mr-0.5 align-middle">check</span>';
         } else if (s === 'AI Alert') style = 'bg-orange-100 text-orange-800';
@@ -468,7 +473,7 @@
   function syncEntityWorkflowAfterCapsuleToggle(statusKey, markDone) {
     if (!currentSpecimen) return;
     if (!currentSpecimen.workflowDone || typeof currentSpecimen.workflowDone !== 'object') {
-      currentSpecimen.workflowDone = { digitalReview: false, entityReview: false, entityStatusDone: {} };
+      currentSpecimen.workflowDone = { digitalReview: false, aiAlertConfirmed: false, entityReview: false, entityStatusDone: {} };
     }
     if (!currentSpecimen.workflowDone.entityStatusDone || typeof currentSpecimen.workflowDone.entityStatusDone !== 'object') {
       currentSpecimen.workflowDone.entityStatusDone = {};
@@ -476,7 +481,7 @@
     currentSpecimen.workflowDone.entityStatusDone[statusKey] = !!markDone;
     var st = currentSpecimen.status || [];
     var entityStatuses = st.filter(function (x) {
-      return x === 'PLT Check' || x === 'Follow-up' || x === 'AI Alert';
+      return x === 'PLT Check' || x === 'Follow-up';
     });
     currentSpecimen.workflowDone.entityReview = entityStatuses.length > 0 && entityStatuses.every(function (x) {
       return !!currentSpecimen.workflowDone.entityStatusDone[x];
@@ -829,6 +834,9 @@
     } catch (e) {
       // 若瀏覽器禁止 localStorage，略過不影響其他功能
     }
+    if (typeof persistEditedCellsSnapshot === 'function') {
+      persistEditedCellsSnapshot(currentSpecimen.id, cellData);
+    }
   }
 
   function moveSelectedToCategory(category) {
@@ -1074,6 +1082,9 @@
       }
       if (data.type === 'reportManualAlert') {
         var manualAlertId = data.specimenId || currentSpecimenId;
+        if (manualAlertId && cellData && cellData.length && typeof persistEditedCellsSnapshot === 'function') {
+          persistEditedCellsSnapshot(manualAlertId, cellData);
+        }
         if (typeof applySpecimenStatusOverridesFromStorage === 'function') {
           applySpecimenStatusOverridesFromStorage();
         }
@@ -1121,13 +1132,15 @@
       if (!Array.isArray(spec.status)) spec.status = [];
       if (typeof buildWorkflowDoneOnReportVerified === 'function') {
         var verifiedBuilt = buildWorkflowDoneOnReportVerified(spec, {
-          dismissAiAlertOnVerify: !!data.dismissAiAlertOnVerify
+          confirmAiOnVerify: !!data.confirmAiOnVerify,
+          forceUnlockSignOff: !!data.forceUnlockSignOff
         });
         spec.status = verifiedBuilt.status;
         spec.workflowDone = verifiedBuilt.workflowDone;
       } else {
         if (!spec.workflowDone || typeof spec.workflowDone !== 'object') spec.workflowDone = {};
         spec.workflowDone.digitalReview = true;
+        spec.workflowDone.digitalReviewSignedOff = true;
         if (typeof spec.workflowDone.entityReview !== 'boolean') {
           spec.workflowDone.entityReview = (typeof hasAnyEntityReviewTask === 'function') ? !hasAnyEntityReviewTask(spec) : false;
         }
