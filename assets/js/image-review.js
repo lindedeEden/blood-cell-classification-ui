@@ -85,6 +85,7 @@
   /** 主內容區捲動時，細胞縮圖曾進入視野者（data-cell-id）；換檢體時清空 */
   var viewedCellIds = new Set();
   var cellViewObserver = null;
+  var gridResizeObserver = null;
 
   function getReadonlyFromUrl() {
     try {
@@ -102,50 +103,109 @@
   }
 
   function applyReadOnlyChrome() {
-    if (!readOnlyMode) {
-      return;
-    }
     var banner = document.getElementById('image-review-readonly-banner');
-    if (banner) {
-      banner.classList.remove('hidden');
-      if (currentSpecimen && currentSpecimen.locked) {
-        banner.textContent = '此檢體已鎖定（他人編輯中），僅能檢視影像與縮放，無法變更細胞分類或核發報告。';
-      } else if (typeof isDigitalReviewHandoffToFollowUp === 'function' && isDigitalReviewHandoffToFollowUp(currentSpecimen)) {
-        banner.textContent = '唯讀模式：已交接至需拉片確認，以下為數位閱片人員編輯快照，僅供檢視。';
-      } else {
-        banner.textContent = '唯讀模式：數位閱片已簽核結案，僅能檢視影像與縮放，無法變更細胞分類或核發報告。';
+    if (readOnlyMode) {
+      if (banner) {
+        banner.classList.remove('hidden');
+        if (currentSpecimen && currentSpecimen.locked) {
+          banner.textContent = '此檢體已鎖定（他人編輯中），僅能檢視影像與縮放，無法變更細胞分類或核發報告。';
+        } else if (typeof isDigitalReviewHandoffToFollowUp === 'function' && isDigitalReviewHandoffToFollowUp(currentSpecimen)) {
+          banner.textContent = '唯讀模式：已交接至需拉片確認，以下為數位閱片人員編輯快照，僅供檢視。';
+        } else {
+          banner.textContent = '唯讀模式：數位閱片已簽核結案，僅能檢視影像與縮放，無法變更細胞分類或核發報告。';
+        }
       }
+      var addFlag = document.getElementById('sidebar-add-flag');
+      if (addFlag) {
+        addFlag.classList.add('opacity-50', 'pointer-events-none');
+        addFlag.title = '唯讀模式無法變更狀態標記';
+      }
+      document.querySelectorAll('#sidebar-status-tags [data-status] .material-symbols-outlined').forEach(function (ic) {
+        ic.classList.add('hidden');
+      });
+    } else {
+      if (banner) banner.classList.add('hidden');
     }
+    updateSaveReportButtonState();
+  }
+
+  /** 未檢視完所有細胞或唯讀時，「儲存並核發報告」反灰不可點 */
+  function updateSaveReportButtonState() {
     var saveBtn = document.getElementById('btn-save-report');
-    if (saveBtn) {
+    if (!saveBtn) return;
+    var total = getTotalCells();
+    var viewed = viewedCellIds.size;
+    var allViewed = total > 0 && viewed >= total;
+
+    if (readOnlyMode) {
       saveBtn.disabled = true;
       saveBtn.setAttribute('aria-disabled', 'true');
-      saveBtn.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+      saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
       saveBtn.title = currentSpecimen && currentSpecimen.locked ? '檢體已鎖定' : '數位閱片已完成';
+      return;
     }
-    var addFlag = document.getElementById('sidebar-add-flag');
-    if (addFlag) {
-      addFlag.classList.add('opacity-50', 'pointer-events-none');
-      addFlag.title = '唯讀模式無法變更狀態標記';
+
+    if (!allViewed) {
+      saveBtn.disabled = true;
+      saveBtn.setAttribute('aria-disabled', 'true');
+      saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      saveBtn.title = total === 0
+        ? '尚無細胞資料'
+        : '請先檢視所有細胞（' + viewed + ' / ' + total + '）';
+      return;
     }
-    document.querySelectorAll('#sidebar-status-tags [data-status] .material-symbols-outlined').forEach(function (ic) {
-      ic.classList.add('hidden');
-    });
+
+    saveBtn.disabled = false;
+    saveBtn.setAttribute('aria-disabled', 'false');
+    saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    saveBtn.removeAttribute('title');
   }
 
   function getDigitalReviewList() {
     if (typeof APP_DATABASE === 'undefined' || !APP_DATABASE.specimens) return [];
-    return APP_DATABASE.specimens.filter(function (s) {
+    var list = APP_DATABASE.specimens.filter(function (s) {
       if (s.locked) return false;
-      var st = s.status || [];
-      var done = typeof isDigitalReviewDone === 'function' ? isDigitalReviewDone(s) : !!s.statusDone;
-      if (st.indexOf('Digital Review') >= 0 && !done) return true;
-      if (st.indexOf('AI Alert') >= 0 && typeof matchesAiAlertForDigitalList === 'function' && matchesAiAlertForDigitalList(s)) {
-        if (typeof isAiAlertConfirmed === 'function' && isAiAlertConfirmed(s)) return false;
-        return !done;
-      }
-      return false;
+      return typeof hasPendingDigitalReviewWork === 'function' && hasPendingDigitalReviewWork(s);
     });
+    if (typeof UsabilityStudy !== 'undefined' && UsabilityStudy.isActive && UsabilityStudy.isActive()) {
+      list = UsabilityStudy.filterSpecimensForList(list);
+    }
+    return list;
+  }
+
+  /** 依清單／情境順序，取得簽核完成後下一筆待數位閱片檢體（DR 或 DR+AI 待辦） */
+  function getOrderedSpecimensForDigitalNavigation() {
+    if (typeof APP_DATABASE === 'undefined' || !APP_DATABASE.specimens) return [];
+    var list = APP_DATABASE.specimens.slice();
+    if (typeof UsabilityStudy !== 'undefined' && UsabilityStudy.isActive && UsabilityStudy.isActive()) {
+      list = UsabilityStudy.filterSpecimensForList(list);
+    }
+    return list;
+  }
+
+  function getNextPendingDigitalSpecimenAfter(completedId) {
+    var pending = getDigitalReviewList();
+    if (!pending.length) return null;
+    var pendingById = {};
+    pending.forEach(function (s) { pendingById[s.id] = s; });
+    var ordered = getOrderedSpecimensForDigitalNavigation();
+    var startIdx = 0;
+    if (completedId) {
+      for (var k = 0; k < ordered.length; k++) {
+        if (ordered[k].id === completedId) {
+          startIdx = k + 1;
+          break;
+        }
+      }
+    }
+    var i;
+    for (i = startIdx; i < ordered.length; i++) {
+      if (pendingById[ordered[i].id]) return pendingById[ordered[i].id];
+    }
+    for (i = 0; i < startIdx; i++) {
+      if (pendingById[ordered[i].id]) return pendingById[ordered[i].id];
+    }
+    return pending[0];
   }
 
   function getSpecimenById(id) {
@@ -598,6 +658,7 @@
     }
     var pct = total ? (viewed / total * 100) : 100;
     if (barEl) barEl.style.width = pct + '%';
+    updateSaveReportButtonState();
   }
 
   function renderCellGroups() {
@@ -632,7 +693,7 @@
       html += '<div class="flex items-baseline gap-2"><h2 class="text-lg font-bold ' + titleClass + '">' + catName + '</h2><span class="text-sm font-medium ' + subClass + ' section-count">(' + count + ' Cells, ' + pct + '%)</span></div></div>';
       html += '<span class="toggle-icon material-symbols-outlined text-gray-400 transition-transform duration-200 icon-rotate-180">expand_more</span></div>';
       html += '<div class="grid-content px-4 pb-4 grid-expanded transition-all duration-300 section-content">';
-      html += '<div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-16 gap-2 mt-2 cell-grid" data-category="' + catName + '">';
+      html += '<div class="grid gap-2 mt-2 cell-grid" data-category="' + catName + '">';
       cells.forEach(function (cell) {
         var sel = selectedCellIds.has(cell.id) ? ' ring-2 ring-primary' : '';
         html += '<div class="cell-image-container relative aspect-square cursor-pointer transition-all rounded-lg border-2 border-gray-300' + sel + '" data-cell-id="' + cell.id + '" data-category="' + catName + '" draggable="' + (readOnlyMode ? 'false' : 'true') + '"><img alt="Cell" class="w-full h-full object-cover rounded-lg" src="' + (cell.imageUrl || '') + '"/></div>';
@@ -642,7 +703,7 @@
     container.innerHTML = html;
     bindCellEvents();
     setupCellViewObserver();
-    applyZoom();
+    scheduleApplyZoom();
   }
 
   function bindCellEvents() {
@@ -766,13 +827,80 @@
     });
   }
 
+  var CELL_IMAGE_BASE_REM = 4.5; // 100% 時每格約 4.5rem，隨 html 字級一併縮放
+
+  function getRootFontSizePx() {
+    var px = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+    return isNaN(px) || px <= 0 ? 16 : px;
+  }
+
+  function getCellSizePx() {
+    return CELL_IMAGE_BASE_REM * (zoomLevel / 100) * getRootFontSizePx();
+  }
+
+  function getGridGapPx(gridEl) {
+    if (!gridEl) return 8;
+    var gap = window.getComputedStyle(gridEl).columnGap || window.getComputedStyle(gridEl).gap;
+    var n = parseFloat(gap);
+    return isNaN(n) || n < 0 ? 8 : n;
+  }
+
   function applyZoom() {
-    var baseSize = 72; // 100% 時每顆細胞約寬 72px
-    var size = baseSize * (zoomLevel / 100);
-    var grids = document.querySelectorAll('.cell-grid');
-    grids.forEach(function (g) {
-      g.style.gridTemplateColumns = 'repeat(auto-fill, minmax(' + size + 'px, 1fr))';
+    var factor = zoomLevel / 100;
+    if (typeof window.syncCellZoomCssVar === 'function') {
+      window.syncCellZoomCssVar(zoomLevel);
+    } else {
+      try {
+        document.documentElement.style.setProperty('--cell-zoom-factor', String(factor));
+      } catch (e) {}
+    }
+    var cellPx = getCellSizePx();
+    var cellPxStr = cellPx.toFixed(2) + 'px';
+    try {
+      document.documentElement.style.setProperty('--cell-image-size', cellPxStr);
+    } catch (e) {}
+    document.querySelectorAll('.cell-grid').forEach(function (g) {
+      var width = g.clientWidth;
+      if (width <= 0) {
+        g.style.gridTemplateColumns = 'repeat(auto-fill, ' + cellPxStr + ')';
+        return;
+      }
+      var gapPx = getGridGapPx(g);
+      var cols = Math.max(1, Math.floor((width + gapPx) / (cellPx + gapPx)));
+      g.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cellPxStr + ')';
     });
+  }
+
+  /** Edge 等瀏覽器在捲軸／字型載入後才穩定版面，需延後重算 */
+  function scheduleApplyZoom() {
+    applyZoom();
+    requestAnimationFrame(function () {
+      applyZoom();
+      requestAnimationFrame(applyZoom);
+    });
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(applyZoom).catch(function () {});
+    }
+  }
+
+  function disconnectGridResizeObserver() {
+    if (gridResizeObserver) {
+      gridResizeObserver.disconnect();
+      gridResizeObserver = null;
+    }
+  }
+
+  function setupGridResizeObserver() {
+    disconnectGridResizeObserver();
+    if (typeof window.ResizeObserver === 'undefined') return;
+    var groupsEl = document.getElementById('main-cell-groups');
+    if (!groupsEl) return;
+    var scrollRoot = groupsEl.parentElement;
+    gridResizeObserver = new ResizeObserver(function () {
+      applyZoom();
+    });
+    gridResizeObserver.observe(groupsEl);
+    if (scrollRoot) gridResizeObserver.observe(scrollRoot);
   }
 
   // 依目前細胞區塊的分類結果，計算「人員編輯」用的百分比數據，
@@ -917,6 +1045,8 @@
 
   function onSaveReport() {
     if (readOnlyMode) return;
+    var saveBtn = document.getElementById('btn-save-report');
+    if (saveBtn && saveBtn.disabled) return;
     var total = getTotalCells();
     var unidentified = getUnidentifiedCount();
     var viewed = viewedCellIds.size;
@@ -992,10 +1122,12 @@
     digitalReviewList = getDigitalReviewList();
     viewedCellIds.clear();
     disconnectCellViewObserver();
+    disconnectGridResizeObserver();
     cellData = getOrCreateCellData(currentSpecimenId);
 
     renderSidebar();
     renderCellGroups();
+    setupGridResizeObserver();
     applyReadOnlyChrome();
 
     var ctxMenu = document.getElementById('context-menu');
@@ -1031,19 +1163,31 @@
         zoomLevel = Math.min(200, Math.max(50, zoomLevel + delta));
       }
       if (zoomEl) zoomEl.textContent = zoomLevel + '%';
-      applyZoom();
+      scheduleApplyZoom();
     }
     if (zoomEl) zoomEl.textContent = zoomLevel + '%';
     if (zoomIn) zoomIn.addEventListener('click', function () { updateZoom(10); });
     if (zoomOut) zoomOut.addEventListener('click', function () { updateZoom(-10); });
 
+    var resizeTimer;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(scheduleApplyZoom, 100);
+    });
+
     var fontSmaller = document.getElementById('font-smaller');
     var fontLarger = document.getElementById('font-larger');
     if (fontSmaller && typeof window.adjustAppFontLevel === 'function') {
-      fontSmaller.addEventListener('click', function () { window.adjustAppFontLevel(-1); });
+      fontSmaller.addEventListener('click', function () {
+        window.adjustAppFontLevel(-1);
+        scheduleApplyZoom();
+      });
     }
     if (fontLarger && typeof window.adjustAppFontLevel === 'function') {
-      fontLarger.addEventListener('click', function () { window.adjustAppFontLevel(1); });
+      fontLarger.addEventListener('click', function () {
+        window.adjustAppFontLevel(1);
+        scheduleApplyZoom();
+      });
     }
 
     var reportClose = document.getElementById('report-issue-close');
@@ -1100,9 +1244,9 @@
           queueManualAlertToast(manualAlertId, data.addedFollowUp !== false);
         }
         if (typeof goToSpecimenList === 'function') {
-          goToSpecimenList();
+          goToSpecimenList({ preferMode: 'digital' });
         } else if (typeof window.goToSpecimenList === 'function') {
-          window.goToSpecimenList();
+          window.goToSpecimenList({ preferMode: 'digital' });
         }
         return;
       }
@@ -1173,13 +1317,15 @@
       var reportModal = document.getElementById('report-issue-modal');
       if (reportModal) reportModal.classList.add('hidden');
       if (data.navigateNextDigitalReview) {
-        var nextPending = digitalReviewList && digitalReviewList.length > 0 ? digitalReviewList[0] : null;
+        var nextPending = getNextPendingDigitalSpecimenAfter(id);
         if (nextPending && nextPending.id) {
           goToSpecimen(nextPending.id);
           return;
         }
       }
-      if (typeof window.goToSpecimenList === 'function') window.goToSpecimenList();
+      if (typeof window.goToSpecimenList === 'function') {
+        window.goToSpecimenList({ preferMode: 'digital' });
+      }
     });
   }
 

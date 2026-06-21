@@ -126,7 +126,7 @@ localStorage.setItem(APP_SPECIMEN_STATUS_STORAGE_KEY, JSON.stringify(map));
 ### 資料夾結構
 
 ```
-v2-優化架構版/
+血球分類軟體介面設計專案/
 ├── index.html                    # 登入頁（不含病患資料）
 ├── 檢體管理.html                  # 登入後才載入，受 requireAuth() 保護
 ├── 影像檢視與細胞編輯.html

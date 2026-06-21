@@ -123,7 +123,8 @@
     var editedMetrics = spec.editedMetrics || {};
     var hasEdited = Object.keys(editedMetrics).length > 0;
     var useEdited = hasEdited && editedDiffersFromAi(editedMetrics, metrics);
-    return useEdited ? editedMetrics : metrics;
+    /** 人員編輯僅覆寫分類百分比；WBC 等非分類欄位仍取自 metrics */
+    return useEdited ? Object.assign({}, metrics, editedMetrics) : metrics;
   }
 
   function getRiskState(spec, effectiveMetrics) {
@@ -165,8 +166,8 @@
     if (!spec) return false;
     var effective = getEffectiveMetricsForRisk(spec);
     var risk = getRiskState(spec, effective);
-    /** 僅紅色橫幅（新發留單）時提供「改為人工鏡檢」 */
-    if (!risk.hasNewLeave) return false;
+    /** 紅色（新發留單）或黃色（延續性異常）橫幅時提供「改為人工鏡檢」 */
+    if (!risk.hasLeaveNow) return false;
     /** 已有待辦需拉片：改點「已拉片完成」，不重複顯示 */
     if (typeof needsPendingFollowUpReview === 'function' && needsPendingFollowUpReview(spec)) return false;
     var st = spec.status || [];
@@ -174,7 +175,7 @@
     if (st.indexOf('Digital Review') !== -1) {
       return typeof isDigitalReviewDone === 'function' ? !isDigitalReviewDone(spec) : true;
     }
-    /** 僅 AI Alert、待確認 */
+    /** DR 已完成、僅 AI 尚待確認（須已有 DR+AI 膠囊） */
     return isAiAlertPendingConfirmation(spec);
   }
 
@@ -183,6 +184,7 @@
     if (!Array.isArray(spec.status)) spec.status = [];
     var hadFollowUp = spec.status.indexOf('Follow-up') !== -1;
     var st = spec.status.slice();
+    /** 劇本規則：改人工鏡檢前應已有 DR（±AI）；缺漏時補上膠囊僅作防呆 */
     if (st.indexOf('Digital Review') === -1) st.push('Digital Review');
     if (!hadFollowUp && st.indexOf('Follow-up') === -1) st.push('Follow-up');
     if (typeof migrateLegacyManualAlertStatus === 'function') {
@@ -214,7 +216,7 @@
       icon.textContent = 'warning';
       icon.className = 'material-symbols-outlined text-white fill-1 scale-100';
       text.className = 'text-md font-bold leading-tight tracking-tight text-white';
-      text.textContent = '留單警示：本次出現新發留單條件，請確認是否需人工鏡檢或留單後再核發';
+      text.textContent = '留單警示：本次出現新發留單條件，請確認是否需人工鏡檢';
     } else if (risk.hasLeaveNow) {
       banner.className += ' bg-amber-500 border-amber-500/20';
       icon.textContent = 'info';
@@ -258,8 +260,11 @@
 
   function fillCbcPanel(spec) {
     var c = spec.cbc || {};
+    var effective = getEffectiveMetricsForRisk(spec);
+    var wbcValue = effective.wbc != null ? effective.wbc : (c.wbc != null ? c.wbc : '-');
+    var wbcAbnormal = typeof isAbnormalMetricValue === 'function' && isAbnormalMetricValue('wbc', wbcValue);
     var byId = {
-      'cbc-wbc': c.wbc,
+      'cbc-wbc': wbcValue,
       'cbc-rbc': c.rbc,
       'cbc-hb': c.hb,
       'cbc-hct': c.hct,
@@ -268,9 +273,21 @@
       'cbc-mchc': c.mchc,
       'cbc-plt': c.plt
     };
+    var defaultValueClass = 'text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular';
+    var abnormalValueClass = 'text-medical-red text-sm font-black tabular';
+    var defaultLabelClass = 'text-zinc-600 text-[9px] font-bold uppercase tracking-tight';
+    var abnormalLabelClass = 'text-medical-red text-[9px] font-bold uppercase tracking-tight';
     Object.keys(byId).forEach(function (id) {
       var el = document.getElementById(id);
-      if (el) el.textContent = byId[id] != null ? byId[id] : '-';
+      if (!el) return;
+      el.textContent = byId[id] != null ? byId[id] : '-';
+      if (id === 'cbc-wbc') {
+        el.className = wbcAbnormal ? abnormalValueClass : defaultValueClass;
+        var labelEl = el.previousElementSibling;
+        if (labelEl) labelEl.className = wbcAbnormal ? abnormalLabelClass : defaultLabelClass;
+      } else {
+        el.className = defaultValueClass;
+      }
     });
   }
 
@@ -339,8 +356,8 @@
     var pendingFollowUp = typeof needsPendingFollowUpReview === 'function' && needsPendingFollowUpReview(spec);
     var effective = typeof getEffectiveMetricsForRisk === 'function' ? getEffectiveMetricsForRisk(spec) : {};
     var risk = typeof getRiskState === 'function' ? getRiskState(spec, effective) : { hasNewLeave: false };
-    var signOffBlocked = (pendingFollowUp || !!risk.hasNewLeave) && !verifySignOffUnlocked;
-    var showLock = pendingFollowUp || !!risk.hasNewLeave;
+    var signOffBlocked = (pendingFollowUp || !!risk.hasLeaveNow) && !verifySignOffUnlocked;
+    var showLock = pendingFollowUp || !!risk.hasLeaveNow;
     var confirmBtn = document.getElementById('confirm-btn');
     var lockBtn = document.getElementById('verify-lock-btn');
     var lockIcon = document.getElementById('verify-lock-icon');
@@ -351,7 +368,7 @@
       confirmBtn.classList.toggle('opacity-50', !!signOffBlocked);
       confirmBtn.classList.toggle('cursor-not-allowed', !!signOffBlocked);
       confirmBtn.classList.toggle('pointer-events-none', !!signOffBlocked);
-      confirmBtn.title = signOffBlocked ? '尚有需拉片或未解除紅色留單鎖定，請開鎖或先完成拉片' : '';
+      confirmBtn.title = signOffBlocked ? '尚有需拉片或未解除留單鎖定，請開鎖、改為人工鏡檢或先完成拉片' : '';
     }
     if (lockBtn) {
       lockBtn.classList.toggle('hidden', !showLock);
@@ -365,7 +382,9 @@
         } else {
           lockBtn.classList.add('bg-zinc-200', 'border-zinc-300', 'text-zinc-600');
           lockBtn.classList.remove('bg-amber-50', 'border-amber-400', 'text-amber-800');
-          lockBtn.title = risk.hasNewLeave ? '紅色留單：點擊開鎖後可強制數位簽核' : '點擊開鎖後可強制簽核（略過需拉片）';
+          lockBtn.title = risk.hasNewLeave
+            ? '紅色留單：點擊開鎖後可強制數位簽核'
+            : (risk.hasLeaveNow ? '延續性異常：點擊開鎖後可強制數位簽核' : '點擊開鎖後可強制簽核（略過需拉片）');
           lockBtn.setAttribute('aria-label', '點擊開鎖簽核');
         }
         if (lockIcon) lockIcon.textContent = verifySignOffUnlocked ? 'lock_open' : 'lock';
@@ -409,7 +428,7 @@
         if (window.self !== window.top && window.parent) {
           window.parent.postMessage({ type: 'reportCancel' }, '*');
         } else if (typeof goToSpecimenList === 'function') {
-          goToSpecimenList();
+          goToSpecimenList({ preferMode: 'digital' });
         }
       });
     }
@@ -422,7 +441,7 @@
         if (s) {
           var effectiveSign = getEffectiveMetricsForRisk(s);
           var riskSign = getRiskState(s, effectiveSign);
-          if (riskSign.hasNewLeave && !verifySignOffUnlocked) return;
+          if (riskSign.hasLeaveNow && !verifySignOffUnlocked) return;
         }
         var sid = s ? s.id : '';
         var navigateNextDigitalReview = false;
@@ -459,7 +478,7 @@
             persistSpecimenStatusOverride(sid, s.status, { workflowDone: s.workflowDone, editor: s.editor || '' });
           }
           if (s && s.statusDone && typeof queueReportVerifiedToast === 'function') queueReportVerifiedToast(sid);
-          goToSpecimenList();
+          goToSpecimenList({ preferMode: 'digital' });
         }
       });
     }
@@ -471,7 +490,7 @@
         if (!s || typeof needsPendingFollowUpReview !== 'function') return;
         var effectiveLock = getEffectiveMetricsForRisk(s);
         var riskLock = getRiskState(s, effectiveLock);
-        var needsLock = needsPendingFollowUpReview(s) || !!riskLock.hasNewLeave;
+        var needsLock = needsPendingFollowUpReview(s) || !!riskLock.hasLeaveNow;
         if (!needsLock) return;
         verifySignOffUnlocked = !verifySignOffUnlocked;
         applyReportFooterActions(s);
@@ -510,7 +529,7 @@
           }, '*');
         } else if (typeof goToSpecimenList === 'function') {
           if (typeof queueManualAlertToast === 'function') queueManualAlertToast(s.id, addedFollowUp);
-          goToSpecimenList();
+          goToSpecimenList({ preferMode: 'digital' });
         }
       });
     }

@@ -6,15 +6,25 @@
 <script>
         (function () {
             try {
-                var key = 'blood-morphology-font-level';
-                var classes = ['font-size-small', 'font-size-normal', 'font-size-large', 'font-size-xlarge'];
-                var raw = window.localStorage.getItem(key);
-                var level = parseInt(raw, 10);
-                if (isNaN(level)) level = 1;
-                level = Math.max(0, Math.min(3, level));
                 var root = document.documentElement;
-                classes.forEach(function (c) { root.classList.remove(c); });
-                root.classList.add(classes[level]);
+                var fontKey = 'blood-morphology-font-level';
+                var fontClasses = ['font-size-small', 'font-size-normal', 'font-size-large', 'font-size-xlarge'];
+                var fontRaw = window.localStorage.getItem(fontKey);
+                var fontLevel = parseInt(fontRaw, 10);
+                if (isNaN(fontLevel)) fontLevel = 1;
+                fontLevel = Math.max(0, Math.min(3, fontLevel));
+                fontClasses.forEach(function (c) { root.classList.remove(c); });
+                root.classList.add(fontClasses[fontLevel]);
+
+                var zoomKey = 'blood-morphology-cell-image-zoom';
+                var zoomRaw = window.localStorage.getItem(zoomKey);
+                var zoom = parseInt(zoomRaw, 10);
+                if (isNaN(zoom)) zoom = 100;
+                zoom = Math.max(50, Math.min(200, zoom));
+                var fontScale = [0.875, 1, 1.125, 1.25][fontLevel];
+                var cellPx = 4.5 * (zoom / 100) * 16 * fontScale;
+                root.style.setProperty('--cell-zoom-factor', String(zoom / 100));
+                root.style.setProperty('--cell-image-size', cellPx.toFixed(2) + 'px');
             } catch (e) {}
         })();
     </script>
@@ -231,7 +241,7 @@
 <div id="image-review-readonly-banner" class="hidden shrink-0 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-950 text-sm font-medium text-center" role="status">
         唯讀模式：數位閱片已完成，僅能檢視影像與縮放，無法變更細胞分類或核發報告。
     </div>
-<div class="flex-1 min-h-0 overflow-y-auto p-6 scroll-smooth overscroll-contain">
+<div class="flex-1 min-h-0 overflow-y-auto p-6 scroll-smooth overscroll-contain image-review-scroll">
 <div class="w-full min-w-0 space-y-6" id="main-cell-groups">
   <!-- 初始不放任何靜態細胞卡片，全部由 image-review.js 動態產生 -->
 </div>
@@ -308,11 +318,25 @@
 </details>
 </div>
 </div>
-<script src="assets/data/database.js?v=20260601f"></script>
-<script src="assets/data/cell-sample-images.js?v=20260601f"></script>
-<script src="assets/js/common.js?v=20260601f"></script>
-<script src="assets/js/tutorial.js?v=20260530b"></script>
-<script src="assets/js/image-review.js?v=20260601f"></script>
+
+  <!-- ▌ v2 架構層：必須在 database.js / common.js 之前載入 -->
+  <script src="src/config/config.js"></script>
+  <script src="src/constants/cell-types.js"></script>
+  <script src="src/services/api.service.js"></script>
+  <script src="src/services/auth.service.js"></script>
+  <script src="src/services/specimen.service.js"></script>
+  <script src="src/store/app.store.js"></script>
+  <!-- ▌ Auth Guard：未登入直接導回登入頁 -->
+  <script>AuthService.requireAuth();</script>
+  <!-- ▌ 原版資料與共用模組 -->
+  <script src="assets/data/database.js?v=20260618g"></script>
+  <script src="assets/data/scenario-specimens.js?v=20260618g"></script>
+  <script src="assets/data/cell-sample-images.js?v=20260601f"></script>
+  <script src="assets/data/scenario-specimen-cells.js?v=20260618h"></script>
+  <script src="assets/js/common.js?v=20260618k"></script>
+  <script src="assets/js/usability-study.js?v=20260618g"></script>
+  <script src="assets/js/tutorial.js?v=20260618t"></script>
+  <script src="assets/js/image-review.js?v=20260618j"></script>
 <script>
     function toggleGrid(headerEl) {
       var card = headerEl && headerEl.closest ? headerEl.closest('.group') : (headerEl && headerEl.parentElement);

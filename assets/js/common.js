@@ -61,8 +61,15 @@ function getStoredCellImageZoomLevel() {
   }
 }
 
+function syncCellZoomCssVar(level) {
+  try {
+    document.documentElement.style.setProperty('--cell-zoom-factor', String(clampCellImageZoomLevel(level) / 100));
+  } catch (e) {}
+}
+
 function applyCellImageZoomLevel(level) {
   level = clampCellImageZoomLevel(level);
+  syncCellZoomCssVar(level);
   try {
     localStorage.setItem(APP_CELL_IMAGE_ZOOM_STORAGE_KEY, String(level));
   } catch (e) {}
@@ -396,11 +403,45 @@ function getSpecimenIdFromUrl() {
   return params.get('specimen') || params.get('id') || '';
 }
 
+var REVIEW_RETURN_LIST_MODE_KEY = 'blood-morphology-review-return-list-mode';
+var SPECIMEN_LIST_MODE_STORAGE_KEY = 'blood-morphology-specimen-list-mode';
+
+/** 進入影像檢視前記住檢體管理模式，返回列表時還原（改人工鏡檢／簽核後跳回列表） */
+function rememberSpecimenListModeForReviewReturn() {
+  try {
+    var mode = localStorage.getItem(SPECIMEN_LIST_MODE_STORAGE_KEY);
+    if (mode !== 'digital' && mode !== 'entity') mode = 'digital';
+    sessionStorage.setItem(REVIEW_RETURN_LIST_MODE_KEY, mode);
+  } catch (e) {}
+}
+
+function consumeReviewReturnListMode() {
+  try {
+    var mode = sessionStorage.getItem(REVIEW_RETURN_LIST_MODE_KEY);
+    if (mode === 'digital' || mode === 'entity') return mode;
+  } catch (e) {}
+  return null;
+}
+
+function clearReviewReturnListMode() {
+  try {
+    sessionStorage.removeItem(REVIEW_RETURN_LIST_MODE_KEY);
+  } catch (e) {}
+}
+
+function persistSpecimenListModeSelection(mode) {
+  if (mode !== 'digital' && mode !== 'entity') return;
+  try {
+    localStorage.setItem(SPECIMEN_LIST_MODE_STORAGE_KEY, mode);
+  } catch (e) {}
+}
+
 // 導向影像檢視頁（opts.readonly 為 true 時附加 readonly=1，供唯讀檢視）
 function goToImageReview(specimenId, opts) {
   if (!specimenId || typeof getSpecimenById !== 'function') return false;
   var spec = getSpecimenById(specimenId);
   if (spec && spec.locked && !(opts && opts.readonly)) return false;
+  rememberSpecimenListModeForReviewReturn();
   const base = getBasePath();
   let url = base + '影像檢視與細胞編輯.html?specimen=' + encodeURIComponent(specimenId);
   if (opts && opts.readonly) url += '&readonly=1';
@@ -446,8 +487,15 @@ function goToReportIssue(specimenId) {
   window.location.href = url;
 }
 
-// 返回檢體管理
-function goToSpecimenList() {
+// 返回檢體管理（opts.preferMode：返回後強制還原數位／實體模式）
+function goToSpecimenList(opts) {
+  var prefer = opts && opts.preferMode;
+  if (prefer !== 'digital' && prefer !== 'entity') {
+    prefer = consumeReviewReturnListMode();
+  }
+  if (prefer === 'digital' || prefer === 'entity') {
+    persistSpecimenListModeSelection(prefer);
+  }
   const base = getBasePath();
   window.location.href = base + '檢體管理.html';
 }
@@ -524,14 +572,31 @@ const MODE_DEFAULT_STATUS = {
   entity: ['Follow-up', 'PLT Check']
 };
 
-/** 同時具 AI分類警示與需拉片確認：僅在實體作業清單顯示 */
+/**
+ * 四種膠囊規則（檢體管理清單／劇本）— 詳見 WORKFLOW-狀態膠囊流程.md
+ *
+ * 【進線】三步驟（互不相抵觸後合併 status）：
+ *   1. AI 預分類達留單門檻 → AI Alert
+ *   2. LIS 需推片確認 → Follow-up；否則 → Digital Review（FU 與 DR 互斥）
+ *   3. 血小板規則 → PLT Check（可與上併存）
+ *
+ * 【模式】AI+FU（±PLT）僅實體；DR 路徑若有 AI 必 DR+AI；DR±PLT 可數位與實體並行
+ * 【過渡】改為人工鏡檢 → DR✓（+AI✓）+ FU 待辦（+PLT 若本有）→ 僅實體清單
+ * 【不存在初始】單獨 AI、AI+PLT、DR+FU、DR+PLT+FU 等（見文件 §七）
+ */
+
+/** AI+需拉片確認 雙旗標：僅實體作業清單，不進數位閱片模式 */
 function isAiAlertAndFollowUpSpecimen(spec) {
   if (!spec || !Array.isArray(spec.status)) return false;
   var st = spec.status;
   return st.indexOf('AI Alert') !== -1 && st.indexOf('Follow-up') !== -1;
 }
 
-/** 是否仍有待辦的數位閱片流程（含僅 AI 警示、尚未簽核結案者） */
+/**
+ * 是否仍有待辦的數位閱片流程。
+ * 含 DR 待辦，或 DR+AI 時 AI 尚待確認（DR 已完成後第二段）。
+ * 不含 AI+FU 雙旗標；不含無 DR 膠囊的單獨 AI（劇本不應存在）。
+ */
 function hasPendingDigitalReviewWork(spec) {
   if (!spec || !Array.isArray(spec.status)) return false;
   if (isAiAlertAndFollowUpSpecimen(spec)) return false;
@@ -546,7 +611,9 @@ function hasPendingDigitalReviewWork(spec) {
 }
 
 /**
- * 數位閱片模式清單排除：雙旗標（AI+需拉片）或數位流程已結案僅剩實體待辦（如血小板確認）。
+ * 數位閱片模式清單排除：
+ * - AI+FU 雙旗標（僅實體作業）
+ * - 無待辦數位流程（含數位已結僅剩 PLT／FU 實體待辦）
  * 整體流程已完成者不排除，以便在 Verified 篩選下仍可見。
  */
 function shouldExcludeFromDigitalSpecimenList(spec) {
@@ -557,13 +624,16 @@ function shouldExcludeFromDigitalSpecimenList(spec) {
   return !hasPendingDigitalReviewWork(spec);
 }
 
+/** 數位清單內之 AI 待確認：須有 DR 膠囊且非 AI+FU 雙旗標 */
 function matchesAiAlertForDigitalList(spec) {
   if (!spec || !Array.isArray(spec.status) || spec.status.indexOf('AI Alert') === -1) return false;
-  return spec.status.indexOf('Follow-up') === -1;
+  if (spec.status.indexOf('Follow-up') !== -1) return false;
+  return spec.status.indexOf('Digital Review') !== -1;
 }
 
 /**
- * 報告端「改為人工鏡檢」：數位閱片標完成；AI 若有則確認；加入需拉片確認待辦。
+ * 報告端「改為人工鏡檢」過渡狀態：數位閱片與 AI（若有）標完成，新增需拉片確認待辦。
+ * 初始狀態不應出現 DR+FU 並存；此為 DR（±AI）完成後之實體交接。
  */
 function buildWorkflowDoneAfterManualFollowUpFromReport(spec, statusArr) {
   var wf = normalizeWorkflowDone(spec && spec.workflowDone, spec && spec.statusDone);
@@ -602,8 +672,9 @@ function recomputeEntityReviewFromStatus(statusArr, entityStatusDone) {
 
 /**
  * 報告簽核完成（數位流程）：
- * - confirmAiOnVerify：綠／黃橫幅簽核 → aiAlertConfirmed；僅 AI 時補 Digital Review 膠囊
- * - forceUnlockSignOff：開鎖強制簽核 → 確認 AI；有待拉片則一併標完成；補數位閱片綠勾膠囊
+ * - confirmAiOnVerify：綠／黃橫幅簽核 → aiAlertConfirmed
+ * - forceUnlockSignOff：開鎖強制簽核 → 確認 AI；有待拉片則一併標完成
+ * - 簽核完成時若 workflow 已走數位流程，補上 Digital Review 膠囊（顯示完成勾選）
  */
 function buildWorkflowDoneOnReportVerified(spec, options) {
   options = options || {};

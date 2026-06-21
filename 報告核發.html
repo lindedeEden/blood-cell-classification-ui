@@ -242,9 +242,20 @@
 <div class="col-span-6 row-span-4 bg-zinc-500 rounded-lg"></div>
 <div class="col-span-3 row-span-3 bg-zinc-500 rounded-lg"></div>
 </div>
-<script src="assets/data/database.js?v=20260601f"></script>
-<script src="assets/js/common.js?v=20260601f"></script>
-<script src="assets/js/tutorial.js?v=20260411d"></script>
+
+  <!-- ▌ v2 架構層：必須在 database.js / common.js 之前載入 -->
+  <script src="src/config/config.js"></script>
+  <script src="src/constants/cell-types.js"></script>
+  <script src="src/services/api.service.js"></script>
+  <script src="src/services/auth.service.js"></script>
+  <script src="src/services/specimen.service.js"></script>
+  <script src="src/store/app.store.js"></script>
+  <!-- ▌ Auth Guard：未登入直接導回登入頁 -->
+  <script>AuthService.requireAuth();</script>
+  <!-- ▌ 原版資料與共用模組 -->
+  <script src="assets/data/database.js?v=20260601f"></script>
+<script src="assets/js/common.js?v=20260618k"></script>
+<script src="assets/js/tutorial.js?v=20260618t"></script>
 <script src="assets/js/report-issue.js?v=20260601f"></script>
 <script>
 (function () {

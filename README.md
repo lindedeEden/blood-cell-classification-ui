@@ -1,4 +1,4 @@
-# 血球型態分類軟體介面（前端 Demo）
+# 血球型態分類軟體介面（前端 Demo · 優化架構版）
 
 本專案為**林口長庚醫院檢驗醫學科血液組**血球型態閱片流程之**前端示範（Demo）**，模擬醫檢師從：
 
@@ -6,7 +6,7 @@
 
 的完整操作路徑。資料來自內建 **`assets/data/database.js`**；檢體狀態、閱片編輯快照、留單門檻等會寫入瀏覽器 **localStorage**，以便連續操作。
 
-狀態膠囊與雙流程（數位／實體）的詳細說明可另參考 **`狀態膠囊流程說明.docx`**；留單數值標準可參考 **`附件一  林口長庚醫院留單標準.txt`**。
+架構分層與模組說明見 **`ARCHITECTURE.md`**；狀態膠囊流程見 **`WORKFLOW-狀態膠囊流程.md`**；五項痛點情境劇本見 **`assets/data/scenario-specimens.js`**。留單數值標準可參考 **`附件一  林口長庚醫院留單標準.txt`**。
 
 ---
 
@@ -15,30 +15,21 @@
 ```text
 血球分類軟體介面設計專案/
 ├── index.html                          # 登入頁（demo：admin/admin 或 user/user）
-├── 檢體管理.html                       # 檢體管理主介面（含大量內嵌腳本）
+├── 檢體管理.html                       # 檢體管理主介面
 ├── 影像檢視與細胞編輯.html             # 影像閱片與細胞編輯
 ├── 報告核發.html                       # 報告核發（由閱片頁以 iframe 彈出）
-├── 狀態膠囊流程說明.docx               # 狀態膠囊流程圖與文字說明（可由腳本重新產生）
-├── 狀態膠囊樣式對照圖.png              # 膠囊待辦／完成樣式對照圖
-├── 附件一  林口長庚醫院留單標準.txt    # 留單標準參考
-├── build_status_capsule_flow_docx.py   # 產生「狀態膠囊流程說明.docx」
-├── generate_status_capsule_chart.py    # 產生「狀態膠囊樣式對照圖.png」
+├── ARCHITECTURE.md                     # 分層架構與模組說明
+├── WORKFLOW-狀態膠囊流程.md            # 狀態膠囊與雙流程說明
+├── 主持人觀察紀錄表.md                 # 成效調查主持人表
 ├── README.md                           # 本檔：完整說明
+├── src/                                # 設定、服務層、狀態管理
 └── assets/
     ├── data/
-    │   ├── database.js                 # 模擬資料庫（檢體／指標／CBC／狀態等）
+    │   ├── database.js                 # 模擬資料庫
+    │   ├── scenario-specimens.js       # 五項痛點情境劇本
     │   └── cell-sample-images.js       # 細胞示意圖路徑對照
-    ├── css/
-    │   ├── common.css
-    │   └── tutorial.css                # 使用教學覆蓋層
-    ├── js/
-    │   ├── common.js                   # 導頁、留單門檻、workflow、狀態持久化等
-    │   ├── login.js
-    │   ├── image-review.js             # 閱片、細胞群組、單手模式、報告 iframe
-    │   ├── report-issue.js             # 報告畫面、風險橫幅、簽核 postMessage
-    │   └── tutorial.js                 # 步驟式教學（跨頁狀態）
-    └── images/
-        └── cells/                      # 細胞示意圖
+    ├── css/ · js/ · images/            # 樣式、頁面腳本、細胞圖
+    └── …
 ```
 
 ---

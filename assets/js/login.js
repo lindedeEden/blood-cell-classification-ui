@@ -39,6 +39,7 @@
         sessionStorage.setItem('blood-morphology-specimen-ui-reset', '1');
         /** 展示用：清除閱片／Add Flag 等寫入的檢體狀態覆寫，重新登入後還原 database.js 原始資料 */
         localStorage.removeItem('blood-morphology-specimen-status');
+        localStorage.removeItem('blood-morphology-usability-scenario');
         if (typeof clearAllSpecimenEditSnapshotsFromStorage === 'function') {
           clearAllSpecimenEditSnapshotsFromStorage();
         }

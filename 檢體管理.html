@@ -59,6 +59,7 @@
           <a class="hover:text-primary" href="#">工具(T)</a>
           <a class="hover:text-primary" href="#">說明(H)</a>
           <button type="button" class="hover:text-primary focus:outline-none bg-transparent border-0 cursor-pointer text-inherit" id="btn-tutorial" title="使用教學">使用教學</button>
+          <button type="button" class="hover:text-primary focus:outline-none bg-transparent border-0 cursor-pointer text-inherit" id="btn-scenario-simulation" title="情境模擬測試">情境模擬測試</button>
         </div>
       </div>
       <div class="flex items-center space-x-2 shrink-0">
@@ -88,12 +89,12 @@
         <div id="filter-panel" class="bg-surface-light border border-border-light filter-row-fixed-font hidden">
           <p class="font-medium text-text-muted-light filter-panel-title">檢體狀態（勾選要顯示的狀態）</p>
           <div class="filter-panel-check-row">
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="PLT Check"/> <span class="ml-1">PLT Check</span></label>
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="AI Alert"/> <span class="ml-1">AI Alert</span></label>
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Follow-up"/> <span class="ml-1">Follow-up</span></label>
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Digital Review"/> <span class="ml-1">Digital Review</span></label>
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Verified"/> <span class="ml-1">Verified</span></label>
-            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Locked"/> <span class="ml-1">Locked</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="PLT Check"/> <span class="ml-1">血小板確認</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="AI Alert"/> <span class="ml-1">AI分類警示</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Follow-up"/> <span class="ml-1">需拉片確認</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Digital Review"/> <span class="ml-1">數位閱片</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Verified"/> <span class="ml-1">已完成</span></label>
+            <label class="inline-flex items-center"><input type="checkbox" class="status-filter rounded border-gray-300 text-primary focus:ring-primary" value="Locked"/> <span class="ml-1">鎖定中</span></label>
           </div>
         </div>
 
@@ -210,12 +211,29 @@
           <span class="material-symbols-outlined text-xl">close</span>
         </button>
       </div>
-      <p class="px-3 pt-2 text-xs text-text-muted-light leading-relaxed">以下門檻與<strong>影像閱片分析表</strong>、<strong>報告核發風險橫幅</strong>共用。數值型：數值<strong>≥</strong>門檻即視為達留單標準（單位與介面表格一致）。</p>
+      <p class="px-3 pt-2 text-xs text-text-muted-light leading-relaxed shrink-0">以下門檻與<strong>影像閱片分析表</strong>、<strong>報告核發風險橫幅</strong>共用。數值型：數值<strong>≥</strong>門檻即視為達留單標準（單位與介面表格一致）。</p>
       <div class="overflow-y-auto flex-1 p-3 min-h-0" id="modal-leave-settings-body"></div>
       <div class="flex flex-wrap justify-end gap-2 p-3 border-t border-border-light shrink-0 bg-surface-light">
         <button type="button" class="px-3 py-1.5 text-sm border border-border-light rounded-md hover:bg-gray-50 text-text-muted-light" id="modal-leave-settings-reset">還原預設</button>
         <button type="button" class="px-3 py-1.5 text-sm border border-border-light rounded-md hover:bg-gray-50" id="modal-leave-settings-cancel">取消</button>
         <button type="button" class="px-3 py-1.5 text-sm rounded-md bg-primary text-white hover:opacity-95" id="modal-leave-settings-save">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-scenario-simulation" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" aria-modal="true" role="dialog" aria-labelledby="modal-scenario-simulation-title">
+    <div class="absolute inset-0 bg-black/40" id="modal-scenario-simulation-backdrop" aria-hidden="true"></div>
+    <div class="relative bg-white rounded-lg shadow-xl border border-border-light max-w-lg w-full max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between p-3 border-b border-border-light shrink-0">
+        <h2 id="modal-scenario-simulation-title" class="text-base font-semibold text-text-light">情境模擬測試</h2>
+        <button type="button" class="p-1 rounded hover:bg-gray-100 text-text-muted-light" id="modal-scenario-simulation-close" aria-label="關閉">
+          <span class="material-symbols-outlined text-xl">close</span>
+        </button>
+      </div>
+      <div class="overflow-y-auto flex-1 p-3 min-h-0" id="modal-scenario-simulation-body"></div>
+      <div class="flex flex-wrap justify-end gap-2 p-3 border-t border-border-light shrink-0 bg-surface-light">
+        <button type="button" class="px-3 py-1.5 text-sm border border-border-light rounded-md hover:bg-gray-50" id="modal-scenario-simulation-cancel">取消</button>
+        <button type="button" class="px-3 py-1.5 text-sm rounded-md bg-primary text-white hover:opacity-95" id="modal-scenario-simulation-apply">套用情境</button>
       </div>
     </div>
   </div>
@@ -231,9 +249,23 @@
     <button type="button" id="specimen-ctx-reopen-dr" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-text-light text-xs font-medium">退回 Digital Review</button>
   </div>
 
-  <script src="assets/data/database.js?v=20260601f"></script>
-  <script src="assets/js/common.js?v=20260601f"></script>
-  <script src="assets/js/tutorial.js?v=20260411d"></script>
+  
+  <!-- ▌ v2 架構層：必須在 database.js / common.js 之前載入 -->
+  <script src="src/config/config.js"></script>
+  <script src="src/constants/cell-types.js"></script>
+  <script src="src/services/api.service.js"></script>
+  <script src="src/services/auth.service.js"></script>
+  <script src="src/services/specimen.service.js"></script>
+  <script src="src/store/app.store.js"></script>
+  <!-- ▌ Auth Guard：未登入直接導回登入頁 -->
+  <script>AuthService.requireAuth();</script>
+  <!-- ▌ 原版資料與共用模組 -->
+  <script src="assets/data/database.js?v=20260618g"></script>
+  <script src="assets/data/scenario-specimens.js?v=20260618g"></script>
+  <script src="assets/data/scenario-specimen-cells.js?v=20260618h"></script>
+  <script src="assets/js/usability-study.js?v=20260618g"></script>
+  <script src="assets/js/common.js?v=20260618k"></script>
+  <script src="assets/js/tutorial.js?v=20260618t"></script>
   <script>
     (function () {
       var currentSpecimenId = null;
@@ -344,6 +376,10 @@
       function applySpecimenListUiState(state) {
         var data = state || getDefaultUiState();
         var mode = (data.mode === 'digital' || data.mode === 'entity') ? data.mode : null;
+        if (!mode) {
+          var storedMode = getStoredModeSelection();
+          if (storedMode) mode = storedMode;
+        }
         currentMode = mode;
         setModeTabVisual(mode);
         persistModeSelection(mode);
@@ -366,13 +402,32 @@
       }
 
       function applySpecimenListUiDemoDefaults() {
+        var returnMode = typeof consumeReviewReturnListMode === 'function'
+          ? consumeReviewReturnListMode()
+          : null;
+        if (returnMode === 'digital' || returnMode === 'entity') {
+          persistModeSelection(returnMode);
+        }
+        if (typeof clearReviewReturnListMode === 'function') clearReviewReturnListMode();
+
         var savedState = getStoredSpecimenListUiState();
         if (savedState) {
+          if (savedState.mode !== 'digital' && savedState.mode !== 'entity') {
+            var restoredMode = getStoredModeSelection();
+            if (restoredMode) {
+              savedState.mode = restoredMode;
+              savedState.statuses = (MODE_DEFAULT_STATUS[restoredMode] || []).slice();
+            }
+          }
+          if ((savedState.mode !== 'digital' && savedState.mode !== 'entity') && returnMode) {
+            savedState.mode = returnMode;
+            savedState.statuses = (MODE_DEFAULT_STATUS[returnMode] || []).slice();
+          }
           applySpecimenListUiState(savedState);
           return;
         }
         var defaultState = getDefaultUiState();
-        var restoredMode = getStoredModeSelection();
+        var restoredMode = getStoredModeSelection() || returnMode;
         if (restoredMode) {
           defaultState.mode = restoredMode;
           defaultState.statuses = (MODE_DEFAULT_STATUS[restoredMode] || []).slice();
@@ -423,7 +478,10 @@
           }
           return true;
         }
-        filteredList = MOCK_SPECIMENS.filter(function (s) {
+        var listSource = (typeof UsabilityStudy !== 'undefined' && UsabilityStudy.filterSpecimensForList)
+          ? UsabilityStudy.filterSpecimensForList(MOCK_SPECIMENS)
+          : MOCK_SPECIMENS;
+        filteredList = listSource.filter(function (s) {
           if (currentMode === 'digital' && typeof shouldExcludeFromDigitalSpecimenList === 'function' && shouldExcludeFromDigitalSpecimenList(s)) {
             return false;
           }
@@ -569,6 +627,7 @@
             var st = spec.status || [];
             var drReadOnly = typeof isDigitalReviewReadOnly === 'function' && isDigitalReviewReadOnly(spec);
             if (drReadOnly) return;
+            persistSpecimenListUiState();
             goToImageReview(id);
           });
         });
@@ -576,7 +635,10 @@
           btn.addEventListener('click', function (e) {
             e.stopPropagation();
             var id = btn.dataset.id;
-            if (id) goToImageReview(id);
+            if (id) {
+              persistSpecimenListUiState();
+              goToImageReview(id);
+            }
           });
         });
         tbody.querySelectorAll('.readonly-review-btn').forEach(function (btn) {
@@ -940,6 +1002,67 @@
         body.innerHTML = html.join('');
       }
 
+      function applyUsabilityScenarioUiDefaults() {
+        setModeTabVisual(null);
+        persistModeSelection(null);
+        setStatusFilterCheckboxes(SPECIMEN_LIST_DEMO.statusFiltersAll.slice());
+        var start = document.getElementById('analysis-date-start');
+        var end = document.getElementById('analysis-date-end');
+        var dep = document.getElementById('filter-department');
+        var mac = document.getElementById('filter-machine');
+        var search = document.getElementById('specimen-search');
+        var em = document.getElementById('exact-match');
+        if (start) start.value = SPECIMEN_LIST_DEMO.demoDate;
+        if (end) end.value = SPECIMEN_LIST_DEMO.demoDate;
+        if (dep) dep.value = '';
+        if (mac) mac.value = '';
+        if (search) search.value = '';
+        if (em) em.checked = false;
+      }
+
+      function updateFooterScenarioStatus() {
+        var fs = document.getElementById('footer-status');
+        if (!fs) return;
+        var scenario = (typeof UsabilityStudy !== 'undefined') ? UsabilityStudy.getActiveScenario() : null;
+        if (scenario && scenario.id) {
+          fs.textContent = '情境模擬測試：' + scenario.title;
+        }
+      }
+
+      function buildScenarioSimulationForm(previewId) {
+        var body = document.getElementById('modal-scenario-simulation-body');
+        if (!body || typeof UsabilityStudy === 'undefined') return;
+        var selectedId = (previewId !== undefined && previewId !== null)
+          ? previewId
+          : UsabilityStudy.getActiveScenarioId();
+        body.innerHTML = UsabilityStudy.buildSettingsPanelHtml(selectedId);
+        body.querySelectorAll('input[name="usability-scenario"]').forEach(function (radio) {
+          radio.addEventListener('change', function () {
+            buildScenarioSimulationForm(UsabilityStudy.getSelectedScenarioIdFromPanel());
+          });
+        });
+      }
+
+      function applyScenarioSimulation() {
+        if (typeof UsabilityStudy === 'undefined') return;
+        var nextId = UsabilityStudy.getSelectedScenarioIdFromPanel();
+        UsabilityStudy.applyScenario(nextId);
+        if (nextId) applyUsabilityScenarioUiDefaults();
+        currentSpecimenId = null;
+        var placeholder = document.getElementById('sidebar-placeholder');
+        var content = document.getElementById('sidebar-content');
+        if (placeholder) placeholder.classList.remove('hidden');
+        if (content) content.classList.add('hidden');
+        renderTable();
+        persistSpecimenListUiState();
+        updateFooterScenarioStatus();
+        var fs = document.getElementById('footer-status');
+        if (fs) {
+          var sc = UsabilityStudy.getActiveScenario();
+          fs.textContent = sc && sc.id ? ('已套用：' + sc.title) : '已還原正式清單';
+        }
+      }
+
       function openLeaveSettingsModal() {
         buildLeaveSettingsForm();
         var m = document.getElementById('modal-leave-settings');
@@ -950,14 +1073,32 @@
         if (m) m.classList.add('hidden');
       }
 
+      function openScenarioSimulationModal() {
+        buildScenarioSimulationForm();
+        var m = document.getElementById('modal-scenario-simulation');
+        if (m) m.classList.remove('hidden');
+      }
+      function closeScenarioSimulationModal() {
+        var m = document.getElementById('modal-scenario-simulation');
+        if (m) m.classList.add('hidden');
+      }
+
       var btnSettings = document.getElementById('btn-settings');
       if (btnSettings) btnSettings.addEventListener('click', openLeaveSettingsModal);
+      var btnScenarioSimulation = document.getElementById('btn-scenario-simulation');
+      if (btnScenarioSimulation) btnScenarioSimulation.addEventListener('click', openScenarioSimulationModal);
       var mClose = document.getElementById('modal-leave-settings-close');
       var mBack = document.getElementById('modal-leave-settings-backdrop');
       var mCancel = document.getElementById('modal-leave-settings-cancel');
       if (mClose) mClose.addEventListener('click', closeLeaveSettingsModal);
       if (mBack) mBack.addEventListener('click', closeLeaveSettingsModal);
       if (mCancel) mCancel.addEventListener('click', closeLeaveSettingsModal);
+      var scClose = document.getElementById('modal-scenario-simulation-close');
+      var scBack = document.getElementById('modal-scenario-simulation-backdrop');
+      var scCancel = document.getElementById('modal-scenario-simulation-cancel');
+      if (scClose) scClose.addEventListener('click', closeScenarioSimulationModal);
+      if (scBack) scBack.addEventListener('click', closeScenarioSimulationModal);
+      if (scCancel) scCancel.addEventListener('click', closeScenarioSimulationModal);
       var mReset = document.getElementById('modal-leave-settings-reset');
       if (mReset) mReset.addEventListener('click', function () {
         if (typeof resetLeaveThresholdsToDefaults === 'function') resetLeaveThresholdsToDefaults();
@@ -982,6 +1123,11 @@
         var fs = document.getElementById('footer-status');
         if (fs) fs.textContent = '留單標準已儲存';
       });
+      var scApply = document.getElementById('modal-scenario-simulation-apply');
+      if (scApply) scApply.addEventListener('click', function () {
+        applyScenarioSimulation();
+        closeScenarioSimulationModal();
+      });
 
       if (typeof APP_DATABASE !== 'undefined') {
         var depSel = document.getElementById('filter-department');
@@ -996,6 +1142,7 @@
       updateSortUI();
       renderTable();
       persistSpecimenListUiState();
+      updateFooterScenarioStatus();
 
       var manualAlertToast = typeof consumeManualAlertToastQueue === 'function' ? consumeManualAlertToastQueue() : null;
       var manualAlertToastId = manualAlertToast && manualAlertToast.specimenId ? manualAlertToast.specimenId : null;
