@@ -573,7 +573,7 @@ const MODE_DEFAULT_STATUS = {
 };
 
 /**
- * 四種膠囊規則（檢體管理清單／劇本）— 詳見 WORKFLOW-狀態膠囊流程.md
+ * 四種膠囊規則（檢體管理清單／劇本）— 詳見 ARCHITECTURE.md
  *
  * 【進線】三步驟（互不相抵觸後合併 status）：
  *   1. AI 預分類達留單門檻 → AI Alert

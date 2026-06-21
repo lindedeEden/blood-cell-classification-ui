@@ -65,7 +65,6 @@ https://lindedeEden.github.io/blood-cell-classification-ui/
 │
 ├── tools/generate-facilitator-forms.py # 產生主持人觀察紀錄表 docx/xlsx
 ├── ARCHITECTURE.md                     # 架構審查與分層說明
-├── WORKFLOW-狀態膠囊流程.md            # 狀態膠囊與雙流程說明
 ├── 主持人觀察紀錄表.md                 # 改善後成效調查主持人表
 ├── 附件一  林口長庚醫院留單標準.txt    # 留單標準參考
 └── README.md                           # 本檔
@@ -119,7 +118,7 @@ config.js → cell-types.js → api.service.js → auth.service.js
 | Locked | 鎖定中 | — | 否 |
 | Verified | 已完成 | — | 不渲染膠囊，僅作篩選 |
 
-舊版 **Manual Alert** 讀取時由 `migrateLegacyManualAlertStatus()` 併入 **Follow-up**。完整流程圖見 **`WORKFLOW-狀態膠囊流程.md`**。
+舊版 **Manual Alert** 讀取時由 `migrateLegacyManualAlertStatus()` 併入 **Follow-up**。膠囊與雙流程規則詳見 **`ARCHITECTURE.md`** 與 **`common.js`** 註解。
 
 #### 進入閱片
 
@@ -210,8 +209,7 @@ config.js → cell-types.js → api.service.js → auth.service.js
 
 | 檔案 | 內容 |
 |------|------|
-| `ARCHITECTURE.md` | 原版問題診斷、分層架構、上線建議 |
-| `WORKFLOW-狀態膠囊流程.md` | 狀態膠囊與數位／實體雙流程 |
+| `ARCHITECTURE.md` | 原版問題診斷、分層架構、狀態膠囊與上線建議 |
 | `主持人觀察紀錄表.md` | 改善後成效調查流程與評分表 |
 | `附件一  林口長庚醫院留單標準.txt` | 留單數值標準 |
 
