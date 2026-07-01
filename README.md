@@ -32,45 +32,46 @@ https://lindedeEden.github.io/blood-cell-classification-ui/
 
 ```text
 血球分類軟體介面設計專案/
-├── index.html                          # 登入頁（不載入 database.js）
-├── 檢體管理.html                       # 檢體列表、篩選、狀態膠囊、情境模擬
-├── 影像檢視與細胞編輯.html             # 閱片與細胞編輯
-├── 報告核發.html                       # 報告核發（由閱片頁 iframe 開啟）
+├── index.html                    # 登入（不載入 database.js）
+├── 檢體管理.html                 # 檢體清單／篩選／情境模擬
+├── 影像檢視與細胞編輯.html       # 閱片編輯
+├── 報告核發.html                 # 報告簽核（iframe）
 │
-├── src/                                # 架構層（設定、服務、狀態）
-│   ├── config/config.js                # 全域設定（ENV、API、閒置逾時等）
-│   ├── constants/cell-types.js         # 細胞類型常數（單一來源）
-│   ├── services/
-│   │   ├── api.service.js              # HTTP 抽象（Mock ↔ 真實 API）
-│   │   ├── auth.service.js             # 登入守衛、Token、閒置登出
-│   │   └── specimen.service.js         # 檢體業務邏輯
-│   ├── store/app.store.js              # 集中式狀態
-│   └── utils/validators.js
+├── src/                          # 架構層
+│   ├── config/config.js          # 全域設定（ENV、API、閒置逾時等）
+│   ├── constants/cell-types.js   # 細胞類型常數
+│   ├── services/                 # api、auth、specimen
+│   ├── store/app.store.js        # 集中式狀態
+│   └── utils/validators.js       # 輸入驗證（登入頁）
 │
 ├── assets/
-│   ├── data/
-│   │   ├── database.js                 # Mock 檢體／CBC／狀態資料
-│   │   ├── scenario-specimens.js       # 五項痛點情境劇本
-│   │   ├── scenario-specimen-cells.js  # 情境專用細胞影像對照
+│   ├── data/                     # Mock 資料、情境劇本
+│   │   ├── database.js
+│   │   ├── scenario-specimens.js
+│   │   ├── scenario-specimen-cells.js
 │   │   └── cell-sample-images.js
-│   ├── css/common.css · tutorial.css
-│   ├── js/
-│   │   ├── common.js                   # 導頁、workflow、留單門檻、持久化
-│   │   ├── image-review.js             # 閱片、細胞群組、報告 iframe
-│   │   ├── report-issue.js             # 報告、風險橫幅、簽核 postMessage
-│   │   ├── login.js                    # 登入表單（Demo 本機驗證）
-│   │   ├── tutorial.js                 # 步驟式教學
-│   │   └── usability-study.js          # 成效調查情境切換
-│   └── images/cells/                   # 細胞示意圖
+│   ├── js/                       # common、閱片、報告、教學、調查
+│   ├── css/                      # common.css、tutorial.css
+│   └── images/cells/             # 細胞圖（執行用，18 類）
 │
-├── tools/generate-facilitator-forms.py # 產生主持人觀察紀錄表 docx/xlsx
-├── ARCHITECTURE.md                     # 架構審查與分層說明
-├── 主持人觀察紀錄表.md                 # 改善後成效調查主持人表
-├── 附件一  林口長庚醫院留單標準.txt    # 留單標準參考
-└── README.md                           # 本檔
+├── 血球範例圖片/                  # 原始細胞圖素材
+│
+├── README.md                     # 本檔
+├── ARCHITECTURE.md               # 架構審查與分層說明
+├── 主持人觀察紀錄表.docx         # 成效調查主持人表
+└── 附件一  林口長庚醫院留單標準.txt
 ```
 
-### 腳本載入順序（業務頁）
+### 腳本載入順序
+
+**登入頁（`index.html`）：**
+
+```
+config.js → cell-types.js → api.service.js → auth.service.js
+  → validators.js → 內嵌登入腳本（AuthService.login）
+```
+
+**業務頁（檢體管理／閱片／報告）：**
 
 ```
 config.js → cell-types.js → api.service.js → auth.service.js
@@ -84,8 +85,9 @@ config.js → cell-types.js → api.service.js → auth.service.js
 
 ### 1. 登入（`index.html`）
 
-- 帳密：`admin / admin` 或 `user / user`。
-- 登入成功寫入 **sessionStorage**（`blood-morphology-user-account` 等），導向 `檢體管理.html`。
+- 帳密：`admin / admin` 或 `user / user`（由 `AuthService.login()` 驗證；開發模式走 Mock API）。
+- 表單先經 `Validators.loginForm()` 格式檢查，再呼叫 `AuthService`；登入邏輯內嵌於 `index.html`。
+- 登入成功寫入 **sessionStorage**（`blood-morphology-user-account`、`bhm_session_token` 等），導向 `檢體管理.html`。
 - **重新登入**會清除 `blood-morphology-specimen-status` 與成效調查情境鍵，還原 `database.js` 初始狀態。
 - 業務頁面載入 `AuthService.requireAuth()`；未登入會導回登入頁。閒置逾時（預設 30 分鐘）亦會自動登出。
 
@@ -128,7 +130,7 @@ config.js → cell-types.js → api.service.js → auth.service.js
 
 #### 情境模擬測試（成效調查）
 
-檢體管理頂部「**情境模擬測試**」可切換五項痛點情境（定義於 `scenario-specimens.js`），僅顯示該情境檢體並呈現任務卡。主持人對照答案見 **`主持人觀察紀錄表.md`**。
+檢體管理頂部「**情境模擬測試**」可切換成效調查情境（`scenario-specimens.js` 內 **4 組模組**，涵蓋**五項痛點**；情境四標題為「情境四～五」），僅顯示該情境檢體並呈現任務卡。主持人對照答案見 **`主持人觀察紀錄表.docx`**。
 
 ---
 
@@ -176,7 +178,11 @@ config.js → cell-types.js → api.service.js → auth.service.js
 | `blood-morphology-specimen-list-ui-state` | 列表篩選、排序等 UI |
 | `blood-morphology-specimen-list-mode` | 數位／實體模式 tab |
 | `blood-morphology-usability-scenario` | 成效調查目前情境 ID |
-| `blood-morphology-user-account`（sessionStorage） | 登入帳號 |
+| `blood-morphology-font-level` | 字型大小層級 |
+| `blood-morphology-cell-image-zoom` | 細胞圖縮放比例 |
+| `blood-morphology-user-account`（sessionStorage） | 登入帳號（舊版相容 key） |
+| `bhm_session_token` / `bhm_session_user`（sessionStorage） | AuthService 登入 session |
+| `blood-morphology-specimen-ui-reset`（sessionStorage） | 重新登入後還原列表 UI 預設 |
 | `bloodCellTutorial*` | 教學進度 |
 
 ---
@@ -197,8 +203,7 @@ config.js → cell-types.js → api.service.js → auth.service.js
 |------|------|
 | 修改 workflow／留單規則 | 優先改 `common.js`、`specimen.service.js`，避免列表／閱片／報告三處分叉 |
 | 接後端 | 替換 `api.service.js` 實作、登入改呼叫 `/auth/login`、簽核改呼叫 LIS API |
-| 更新情境劇本 | 編輯 `assets/data/scenario-specimens.js`，同步 `主持人觀察紀錄表.md` |
-| 產生主持人表 | `python tools/generate-facilitator-forms.py` |
+| 更新情境劇本 | 編輯 `assets/data/scenario-specimens.js`，同步更新 `主持人觀察紀錄表.docx` |
 | 避免快取舊腳本 | 更新 HTML 內 `?v=` 查詢參數 |
 
 功能變更時請同步更新 **README.md**、**`tutorial.js`** 教學文案，以及主持人觀察紀錄表（若適用）。
@@ -210,7 +215,7 @@ config.js → cell-types.js → api.service.js → auth.service.js
 | 檔案 | 內容 |
 |------|------|
 | `ARCHITECTURE.md` | 原版問題診斷、分層架構、狀態膠囊與上線建議 |
-| `主持人觀察紀錄表.md` | 改善後成效調查流程與評分表 |
+| `主持人觀察紀錄表.docx` | 改善後成效調查流程與評分表 |
 | `附件一  林口長庚醫院留單標準.txt` | 留單數值標準 |
 
 ---
