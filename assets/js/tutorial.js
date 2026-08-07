@@ -72,8 +72,8 @@
     },
     {
       selector: '#btn-save-report',
-      title: '儲存並核發',
-      body: '完成閱片後點<strong>儲存並核發報告</strong>，於彈出視窗確認資料並簽核。'
+      title: '儲存結果',
+      body: '完成閱片後點<strong>儲存結果</strong>，於彈出視窗確認資料並簽核。'
     }
   ];
 

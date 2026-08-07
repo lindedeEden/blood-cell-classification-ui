@@ -129,7 +129,7 @@
     updateSaveReportButtonState();
   }
 
-  /** 未檢視完所有細胞或唯讀時，「儲存並核發報告」反灰不可點 */
+  /** 未檢視完所有細胞或唯讀時，「儲存結果」反灰不可點 */
   function updateSaveReportButtonState() {
     var saveBtn = document.getElementById('btn-save-report');
     if (!saveBtn) return;
