@@ -83,7 +83,9 @@
       var rowClass = abnormal ? 'bg-medical-red/5 hover:bg-medical-red/10' : 'hover:bg-zinc-50/50';
       var nameClass = abnormal ? 'text-medical-red font-bold' : 'text-zinc-800 dark:text-zinc-200 font-semibold';
       var valueClass = abnormal ? 'text-medical-red font-bold' : 'text-zinc-600';
-      var editedClass = abnormal ? 'text-medical-red font-black bg-medical-red/10' : 'text-zinc-900 dark:text-zinc-100 font-bold bg-blue-50/30';
+      var editedClass = abnormal
+        ? 'text-medical-red font-black bg-red-50 dark:bg-red-900/30 ring-1 ring-inset ring-red-200/60'
+        : 'text-blue-900 dark:text-blue-100 font-extrabold bg-blue-100/80 dark:bg-blue-900/40 ring-1 ring-inset ring-blue-200/70 dark:ring-blue-700/40';
       html += '<tr class="' + rowClass + '">';
       html += '<td class="px-4 py-2 text-base ' + nameClass + '">';
       if (abnormal) {
@@ -251,7 +253,7 @@
       html += '<td class="px-3 py-1.5 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">' + label + '</td>';
       html += '<td class="px-2 py-1.5 text-zinc-600 text-xs text-right tabular">' + (flow || '-') + '</td>';
       html += '<td class="px-2 py-1.5 text-zinc-600 text-xs text-right tabular">' + (ai || '-') + '</td>';
-      html += '<td class="px-2 py-1.5 text-zinc-900 dark:text-zinc-100 text-xs font-bold text-right tabular bg-blue-50/30">' + (edited || '-') + '</td>';
+      html += '<td class="px-2 py-1.5 text-blue-900 dark:text-blue-100 text-xs font-extrabold text-right tabular bg-blue-100/80 dark:bg-blue-900/40 ring-1 ring-inset ring-blue-200/70 dark:ring-blue-700/40">' + (edited || '-') + '</td>';
       html += '<td class="px-2 py-1.5 text-zinc-600 text-xs text-right tabular">' + (prevVal || '-') + '</td>';
       html += '</tr>';
     });
