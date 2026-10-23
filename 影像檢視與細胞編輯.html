@@ -3,31 +3,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>影像檢視與細胞編輯 - 血球型態分類軟體</title>
-<script>
-        (function () {
-            try {
-                var root = document.documentElement;
-                var fontKey = 'blood-morphology-font-level';
-                var fontClasses = ['font-size-small', 'font-size-normal', 'font-size-large', 'font-size-xlarge'];
-                var fontRaw = window.localStorage.getItem(fontKey);
-                var fontLevel = parseInt(fontRaw, 10);
-                if (isNaN(fontLevel)) fontLevel = 1;
-                fontLevel = Math.max(0, Math.min(3, fontLevel));
-                fontClasses.forEach(function (c) { root.classList.remove(c); });
-                root.classList.add(fontClasses[fontLevel]);
-
-                var zoomKey = 'blood-morphology-cell-image-zoom';
-                var zoomRaw = window.localStorage.getItem(zoomKey);
-                var zoom = parseInt(zoomRaw, 10);
-                if (isNaN(zoom)) zoom = 100;
-                zoom = Math.max(50, Math.min(200, zoom));
-                var fontScale = [0.875, 1, 1.125, 1.25][fontLevel];
-                var cellPx = 4.5 * (zoom / 100) * 16 * fontScale;
-                root.style.setProperty('--cell-zoom-factor', String(zoom / 100));
-                root.style.setProperty('--cell-image-size', cellPx.toFixed(2) + 'px');
-            } catch (e) {}
-        })();
-    </script>
+<script src="assets/js/core/ui-preload.js?v=20261023t"></script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -108,10 +84,10 @@
             transform: rotate(180deg);
         }
     </style>
-<link rel="stylesheet" href="assets/css/common.css"/>
-<link rel="stylesheet" href="assets/css/tutorial.css"/>
+<link rel="stylesheet" href="assets/css/common.css?v=20261023t"/>
+<link rel="stylesheet" href="demo/tutorial.css?v=20261023t"/>
 </head>
-<body class="bg-background-light font-display text-gray-800 text-sm min-h-0">
+<body class="bg-background-light font-display text-gray-800 text-sm min-h-0" data-page="image-review">
 <div class="flex h-screen w-full min-h-0 overflow-hidden">
 <aside class="w-1/3 min-w-[300px] max-w-[420px] flex-shrink-0 bg-card border-r border-gray-300/80 flex flex-col p-4 space-y-4 min-h-0 overflow-y-auto overscroll-contain">
 <div class="space-y-4">
@@ -125,36 +101,7 @@
 </div>
 <div class="flex flex-wrap items-center gap-2 px-1">
 <div id="sidebar-status-tags" class="flex flex-wrap items-center gap-2"></div>
-<div class="relative dropdown-container" id="sidebar-add-flag">
-<button type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-gray-600 text-[10px] font-medium hover:bg-gray-50 transition-colors" id="add-flag-btn">
-<span class="material-symbols-outlined text-sm">add</span>
-                        Add Flag
-                    </button>
-<div class="dropdown-menu absolute left-0 top-full mt-2 w-48 bg-white border border-gray-300 rounded-lg shadow-xl z-50 hidden">
-<div class="p-2 border-b border-gray-200">
-<span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">Toggle Status</span>
-</div>
-<!-- Add Flag 小圓點與 common.js STATUS_STYLES 膠囊同色調（*-500 對應各狀態主色） -->
-<div class="p-1 space-y-0.5">
-<label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer group select-none" data-flag="AI Alert" role="button">
-<div class="w-2 h-2 rounded-full bg-orange-500"></div>
-<span class="text-xs font-medium text-gray-700">AI分類警示</span>
-</label>
-<label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer select-none" data-flag="PLT Check" role="button">
-<div class="w-2 h-2 rounded-full bg-blue-500"></div>
-<span class="text-xs font-medium text-gray-700">血小板確認</span>
-</label>
-<label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer select-none" data-flag="Follow-up" role="button">
-<div class="w-2 h-2 rounded-full bg-red-500"></div>
-<span class="text-xs font-medium text-gray-700">需拉片確認</span>
-</label>
-<label class="w-full flex items-center gap-2.5 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer select-none" data-flag="Digital Review" role="button">
-<div class="w-2 h-2 rounded-full bg-purple-500"></div>
-<span class="text-xs font-medium text-gray-700">數位閱片</span>
-</label>
-</div>
-</div>
-</div>
+<!-- 狀態標籤僅供顯示，不提供 Add Flag／刪除（第 5 節） -->
 </div>
 <div class="border-b border-gray-300/80 w-full pt-1"></div>
 <div class="flex flex-col py-2 px-1 space-y-2">
@@ -319,57 +266,36 @@
 </div>
 </div>
 
-  <!-- ▌ v2 架構層：必須在 database.js / common.js 之前載入 -->
-  <script src="src/config/config.js"></script>
-  <script src="src/constants/cell-types.js"></script>
-  <script src="src/services/api.service.js"></script>
-  <script src="src/services/auth.service.js"></script>
-  <script src="src/services/specimen.service.js"></script>
-  <script src="src/store/app.store.js"></script>
-  <!-- ▌ Auth Guard：未登入直接導回登入頁 -->
+  <!-- ▌ 1. 設定、常數與規則（src/，不含畫面程式；正式系統可沿用） -->
+  <script src="src/config/config.js?v=20261023t"></script>
+  <script src="src/constants/cell-types.js?v=20261023t"></script>
+  <script src="src/constants/status.js?v=20261023t"></script>
+  <script src="src/rules/leave-rules.js?v=20261023t"></script>
+  <script src="src/rules/workflow-rules.js?v=20261023t"></script>
+  <script src="src/rules/intake-merge.js?v=20261023t"></script>
+  <script src="src/services/api.service.js?v=20261023t"></script>
+  <script src="src/services/auth.service.js?v=20261023t"></script>
+  <script src="src/services/ai-model.service.js?v=20261023t"></script>
+  <!-- ▌ 2. 登入檢查：未登入直接導回登入頁 -->
   <script>AuthService.requireAuth();</script>
-  <!-- ▌ 原版資料與共用模組 -->
-  <script src="assets/data/database.js?v=20260618g"></script>
-  <script src="assets/data/scenario-specimens.js?v=20260618g"></script>
-  <script src="assets/data/cell-sample-images.js?v=20260601f"></script>
-  <script src="assets/data/scenario-specimen-cells.js?v=20260618h"></script>
-  <script src="assets/js/common.js?v=20260618k"></script>
-  <script src="assets/js/usability-study.js?v=20260618g"></script>
-  <script src="assets/js/tutorial.js?v=20260618t"></script>
-  <script src="assets/js/image-review.js?v=20260618j"></script>
-<script>
-    function toggleGrid(headerEl) {
-      var card = headerEl && headerEl.closest ? headerEl.closest('.group') : (headerEl && headerEl.parentElement);
-      if (!card) return;
-      var content = card.querySelector('.grid-content');
-      var icon = card.querySelector('.toggle-icon');
-      if (content) {
-        if (content.classList.contains('grid-expanded')) {
-          content.classList.remove('grid-expanded');
-          content.classList.add('grid-collapsed');
-          if (icon) icon.classList.remove('icon-rotate-180');
-        } else {
-          content.classList.remove('grid-collapsed');
-          content.classList.add('grid-expanded');
-          if (icon) icon.classList.add('icon-rotate-180');
-        }
-      }
-    }
-    (function () {
-      var contextMenu = document.getElementById('context-menu');
-      if (contextMenu) {
-        document.addEventListener('click', function (e) {
-          if (!contextMenu.contains(e.target)) contextMenu.style.display = 'none';
-        });
-        document.addEventListener('keydown', function (e) {
-          if (e.key === 'Escape') contextMenu.style.display = 'none';
-        });
-        contextMenu.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-      }
-      var backEl = document.getElementById('back-to-list');
-      if (backEl) backEl.addEventListener('click', function (e) { e.preventDefault(); if (typeof goToSpecimenList === 'function') goToSpecimenList(); });
-      if (window.Tutorial) setTimeout(function () { Tutorial.runOnImagePage(); }, 300);
-    })();
-</script>
+  <!-- ▌ 3. 模擬資料（正式系統改由後端 API 取得） -->
+  <!-- 進線：CellaVision 資料庫影像 → AI 模型預分類（AiModelService 模擬）、WAM、LIS 依條碼合併（IntakeMerge）→ database.js -->
+  <script src="assets/data/sources/cellavision-db.js?v=20261023t"></script>
+  <script src="assets/data/sources/ai-model-mock.js?v=20261023t"></script>
+  <script src="assets/data/sources/wam.js?v=20261023t"></script>
+  <script src="assets/data/sources/lis.js?v=20261023t"></script>
+  <script src="assets/data/database.js?v=20261023t"></script>
+  <!-- ▌ 4. 展示用（demo/：教學導覽、情境模擬測試）；可整段移除，不影響正式功能 -->
+  <script src="demo/usability-scenarios.js?v=20261023t"></script>
+  <script src="demo/usability-study.js?v=20261023t"></script>
+  <script src="demo/tutorial.js?v=20261023t"></script>
+  <!-- ▌ 5. 共用核心（瀏覽器儲存、檢體資料與動作、頁面跳轉、共用畫面工具） -->
+  <script src="assets/js/core/storage.js?v=20261023t"></script>
+  <script src="assets/js/core/lis-sync.js?v=20261023t"></script>
+  <script src="assets/js/core/specimen-store.js?v=20261023t"></script>
+  <script src="assets/js/core/navigation.js?v=20261023t"></script>
+  <script src="assets/js/core/ui-common.js?v=20261023t"></script>
+  <!-- ▌ 6. 本頁程式 -->
+  <script src="assets/js/pages/image-review.js?v=20261023t"></script>
 
 </body></html>

@@ -2,21 +2,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>數據核發確認介面</title>
-<script>
-        (function () {
-            try {
-                var key = 'blood-morphology-font-level';
-                var classes = ['font-size-small', 'font-size-normal', 'font-size-large', 'font-size-xlarge'];
-                var raw = window.localStorage.getItem(key);
-                var level = parseInt(raw, 10);
-                if (isNaN(level)) level = 1;
-                level = Math.max(0, Math.min(3, level));
-                var root = document.documentElement;
-                classes.forEach(function (c) { root.classList.remove(c); });
-                root.classList.add(classes[level]);
-            } catch (e) {}
-        })();
-    </script>
+<script src="assets/js/core/ui-preload.js?v=20261023t"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script id="tailwind-config">
@@ -54,10 +40,10 @@
         }
         .tabular { font-variant-numeric: tabular-nums; }
 </style>
-<link rel="stylesheet" href="assets/css/common.css"/>
-<link rel="stylesheet" href="assets/css/tutorial.css"/>
+<link rel="stylesheet" href="assets/css/common.css?v=20261023t"/>
+<link rel="stylesheet" href="demo/tutorial.css?v=20261023t"/>
 </head>
-<body class="bg-background-light font-display h-screen min-h-0 flex items-center justify-center overflow-hidden p-2">
+<body class="bg-background-light font-display h-screen min-h-0 flex items-center justify-center overflow-hidden p-2" data-page="report-issue">
 <div class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-2 min-h-0 overflow-y-auto">
 <div class="bg-white w-full max-w-[1150px] h-auto max-h-[min(98vh,100%)] min-h-0 overflow-hidden rounded-xl shadow-2xl flex flex-col border border-zinc-300 my-auto">
 <div id="tutorial-report-tl">
@@ -113,31 +99,31 @@
 <div class="grid grid-cols-2 p-3 gap-x-4 gap-y-2">
 <div class="col-span-2 pb-1 border-b border-zinc-200 dark:border-zinc-700 flex flex-col gap-0.5">
 <span class="text-zinc-600 text-[9px] tracking-wider font-bold">檢體編號</span>
-<span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">H5080720647</span>
+<span id="report-info-id" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">-</span>
 </div>
 <div class="flex flex-col gap-0.5">
 <span class="text-zinc-600 text-[9px] tracking-wider font-bold">病歷號</span>
-<span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">12701633</span>
+<span id="report-info-patient-id" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">-</span>
 </div>
 <div class="flex flex-col gap-0.5">
 <span class="text-zinc-600 text-[9px] tracking-wider font-bold">姓名 (性別)</span>
-<span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold">王O玲 (女)</span>
+<span id="report-info-name" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold">-</span>
 </div>
 <div class="flex flex-col gap-0.5">
 <span class="text-zinc-600 text-[9px] tracking-wider font-bold">生日 (年齡)</span>
-<span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">1995-08-15 (30 歲)</span>
+<span id="report-info-birth" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">-</span>
 </div>
 <div class="flex flex-col gap-0.5">
 <span class="text-zinc-600 text-[9px] tracking-wider font-bold">檢體來源</span>
-<span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold">一般科</span>
+<span id="report-info-department" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold">-</span>
 </div>
 <div class="flex flex-col gap-0.5">
 <span class="text-zinc-600 text-[9px] tracking-wider font-bold">操作機台</span>
-<span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold uppercase">DI2</span>
+<span id="report-info-machine" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold uppercase">-</span>
 </div>
 <div class="flex flex-col gap-0.5">
 <span class="text-zinc-600 text-[9px] tracking-wider font-bold">檢體歸位</span>
-<span class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">134-5</span>
+<span id="report-info-location" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular-nums">-</span>
 </div>
 </div>
 </div>
@@ -243,23 +229,35 @@
 <div class="col-span-3 row-span-3 bg-zinc-500 rounded-lg"></div>
 </div>
 
-  <!-- ▌ v2 架構層：必須在 database.js / common.js 之前載入 -->
-  <script src="src/config/config.js"></script>
-  <script src="src/constants/cell-types.js"></script>
-  <script src="src/services/api.service.js"></script>
-  <script src="src/services/auth.service.js"></script>
-  <script src="src/services/specimen.service.js"></script>
-  <script src="src/store/app.store.js"></script>
-  <!-- ▌ Auth Guard：未登入直接導回登入頁 -->
+  <!-- ▌ 1. 設定、常數與規則（src/，不含畫面程式；正式系統可沿用） -->
+  <script src="src/config/config.js?v=20261023t"></script>
+  <script src="src/constants/cell-types.js?v=20261023t"></script>
+  <script src="src/constants/status.js?v=20261023t"></script>
+  <script src="src/rules/leave-rules.js?v=20261023t"></script>
+  <script src="src/rules/workflow-rules.js?v=20261023t"></script>
+  <script src="src/rules/intake-merge.js?v=20261023t"></script>
+  <script src="src/services/api.service.js?v=20261023t"></script>
+  <script src="src/services/auth.service.js?v=20261023t"></script>
+  <script src="src/services/ai-model.service.js?v=20261023t"></script>
+  <!-- ▌ 2. 登入檢查：未登入直接導回登入頁 -->
   <script>AuthService.requireAuth();</script>
-  <!-- ▌ 原版資料與共用模組 -->
-  <script src="assets/data/database.js?v=20260601f"></script>
-<script src="assets/js/common.js?v=20260618k"></script>
-<script src="assets/js/tutorial.js?v=20260618t"></script>
-<script src="assets/js/report-issue.js?v=20260807a"></script>
-<script>
-(function () {
-  if (window.Tutorial) setTimeout(function () { Tutorial.runOnReportPage(); }, 200);
-})();
-</script>
+  <!-- ▌ 3. 模擬資料（正式系統改由後端 API 取得） -->
+  <!-- 進線：CellaVision 資料庫影像 → AI 模型預分類（AiModelService 模擬）、WAM、LIS 依條碼合併（IntakeMerge）→ database.js -->
+  <script src="assets/data/sources/cellavision-db.js?v=20261023t"></script>
+  <script src="assets/data/sources/ai-model-mock.js?v=20261023t"></script>
+  <script src="assets/data/sources/wam.js?v=20261023t"></script>
+  <script src="assets/data/sources/lis.js?v=20261023t"></script>
+  <script src="assets/data/database.js?v=20261023t"></script>
+  <!-- ▌ 4. 展示用（demo/：教學導覽、情境模擬測試）；可整段移除，不影響正式功能 -->
+  <script src="demo/usability-scenarios.js?v=20261023t"></script>
+  <script src="demo/usability-study.js?v=20261023t"></script>
+  <script src="demo/tutorial.js?v=20261023t"></script>
+  <!-- ▌ 5. 共用核心（瀏覽器儲存、檢體資料與動作、頁面跳轉、共用畫面工具） -->
+  <script src="assets/js/core/storage.js?v=20261023t"></script>
+  <script src="assets/js/core/lis-sync.js?v=20261023t"></script>
+  <script src="assets/js/core/specimen-store.js?v=20261023t"></script>
+  <script src="assets/js/core/navigation.js?v=20261023t"></script>
+  <script src="assets/js/core/ui-common.js?v=20261023t"></script>
+  <!-- ▌ 6. 本頁程式 -->
+  <script src="assets/js/pages/report-issue.js?v=20261023t"></script>
 </body></html>

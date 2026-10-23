@@ -1,8 +1,7 @@
 /**
- * 應用程式全域設定
+ * AppConfig — 應用程式全域設定（唯一來源）
  *
- * 說明：
- * - 此檔案集中管理所有可調整的設定值，避免「魔法數字」散落各處。
+ * - 可調整的設定值集中在此，避免「魔法數字」散落各處。
  * - 上線前請將 ENV 切換為 'production'，API_BASE_URL 指向真實後端。
  * - 真正的機密（API Key、JWT Secret）絕不可放在前端，需由後端環境變數管理。
  */
@@ -11,40 +10,34 @@ const AppConfig = Object.freeze({
 
   /**
    * 執行環境：'development' | 'production'
-   * development → 使用 Mock API（本地資料），不需要後端
-   * production  → 使用真實 REST API
+   * development → ApiService 使用模擬路由（不需要後端）
+   * production  → ApiService 呼叫真實 REST API
    */
   ENV: 'development',
 
-  /**
-   * 後端 API 根路徑
-   * 上線時改為實際的後端網址，例如 'https://hematology.cgmh.org.tw/api/v1'
-   */
+  /** 後端 API 根路徑（上線時改為實際網址） */
   API_BASE_URL: 'https://api.example-hematology.com/v1',
 
-  /**
-   * API 請求逾時（毫秒）
-   */
+  /** API 請求逾時（毫秒） */
   API_TIMEOUT_MS: 15000,
 
   /**
-   * 認證設定
-   * - TOKEN_STORAGE_KEY：JWT Token 存放的 sessionStorage key（不用 localStorage，避免 XSS 竊取）
-   * - SESSION_TIMEOUT_MS：閒置自動登出時間（30分鐘）
+   * 登入設定
+   * - TOKEN_STORAGE_KEY／USER_KEY：登入資訊存 sessionStorage（不用 localStorage，降低 XSS 竊取風險）
+   * - USER_ACCOUNT_KEY：登入帳號（標記完成時寫入 review.editor「編輯人員」）
+   * - SESSION_TIMEOUT_MS：閒置自動登出時間（文件 1.1 節「登入」，30 分鐘）
    */
   AUTH: Object.freeze({
     TOKEN_STORAGE_KEY: 'bhm_session_token',
     USER_KEY: 'bhm_session_user',
-    // 原版 common.js 讀取的 key，需保持相容
-    LEGACY_USER_KEY: 'blood-morphology-user-account',
+    USER_ACCOUNT_KEY: 'blood-morphology-user-account',
     SESSION_TIMEOUT_MS: 30 * 60 * 1000,
     IDLE_CHECK_INTERVAL_MS: 60 * 1000,
   }),
 
   /**
-   * 留單門檻預設值（林口長庚標準）
-   * 這些值可由後端 /settings/thresholds API 覆寫，
-   * 亦可由管理員在系統設定頁調整後存入後端（而非 localStorage）。
+   * 留單門檻預設值（本科標準，邏輯規則說明文件第 3 節）
+   * 執行中門檻由 LeaveRules 管理；Demo 存 localStorage，正式系統改存後端（規則 7）。
    */
   DEFAULT_LEAVE_THRESHOLDS: Object.freeze({
     wbc: 30,
@@ -61,12 +54,18 @@ const AppConfig = Object.freeze({
     promonocyte: 'present',
     plasmaCell: 'present',
     abnormalLymphocyte: 'present',
+    // 規則 1 年齡相關：<18 歲 Lymphocyte ≥80%；≥18 歲出現 Megakaryocyte 即留單
+    lymphocytePediatric: 80,
+    megakaryocyte: 'present',
   }),
 
+  /** 留單年齡分界（規則 1）：年齡 < 18 適用兒童規則；年齡未知視為成人（規則 1） */
+  LEAVE_PEDIATRIC_AGE_CUTOFF: 18,
+
   /**
-   * AI 分析 API 設定（未來整合用）
-   * endpoint：後端 AI Proxy 路徑（前端不應直接呼叫 AI 廠商 API，避免洩漏 API Key）
-   * confidenceThreshold：信心分數低於此值時，顯示「低信心」警告
+   * AI 模型串接設定（預留；原型尚未使用，以 AiModelService＋sources/ai-model-mock.js 模擬）
+   * 林口人工智慧中心的 AI 模型讀取 CellaVision 資料庫影像並預分類，結果由後端接收（附錄 A #5）；
+   * CONFIDENCE_THRESHOLD：低信心提示門檻（預留）
    */
   AI: Object.freeze({
     ENDPOINT: '/ai/classify',
@@ -75,8 +74,14 @@ const AppConfig = Object.freeze({
   }),
 
   /**
-   * 前端路由設定（多頁應用各頁面 filename）
+   * 時效（第 4 節）：清單的時效欄＝LIS 收件時間到現在經過的分鐘數
+   * - URGENCY_REFRESH_MS：時效更新頻率（暫定 120 秒）
+   * - DEMO_NOW：原型的模擬「現在」時間（模擬資料是 2025-08-07）；開啟頁面後依實際經過時間往前走。正式系統設為 null，用目前時間
    */
+  URGENCY_REFRESH_MS: 120 * 1000,
+  DEMO_NOW: '2025-08-07 22:15',
+
+  /** 頁面檔名（多頁應用） */
   ROUTES: Object.freeze({
     LOGIN: 'index.html',
     SPECIMEN_LIST: '檢體管理.html',
@@ -85,22 +90,30 @@ const AppConfig = Object.freeze({
   }),
 
   /**
-   * 本地儲存 key 集中管理（避免各處硬編字串、難以追蹤）
-   * 原則：只存 UI 偏好（字型大小、縮放）於 localStorage；
-   *       業務狀態（工作流程進度）應送後端，不應存 localStorage。
-   * 此處保留 WORKFLOW_OVERRIDES 僅供 Demo/開發模式使用。
+   * 瀏覽器儲存 key 一覽（唯一來源；讀寫一律經由 assets/js/core/storage.js）
+   *
+   * ⚠️ 標示「Demo」者為原型暫存：正式系統應改存後端資料庫，多人才會一致（第 11 節）。
+   * 例外：font-preload.js 在 <head> 最早執行、此設定尚未載入，FONT_LEVEL 於該檔另寫一次。
    */
   STORAGE_KEYS: Object.freeze({
-    // 與原版 common.js 使用相同 key，確保 Demo 中 UI 偏好正常讀取
+    // ── 使用者介面偏好（localStorage，可保留在瀏覽器）
     FONT_LEVEL: 'blood-morphology-font-level',
     CELL_ZOOM: 'blood-morphology-cell-image-zoom',
-    // ⚠️ 以下僅限 Demo 模式，上線後應移除（改存後端）
-    WORKFLOW_OVERRIDES: 'blood-morphology-specimen-status',
-    USABILITY_SCENARIO: 'blood-morphology-usability-scenario',
+    LIST_MODE: 'blood-morphology-specimen-list-mode',
+    LIST_UI_STATE: 'blood-morphology-specimen-list-ui-state',
+    // ── Demo：業務資料（localStorage；正式系統改存後端）
+    LEAVE_THRESHOLDS: 'blood-morphology-leave-thresholds',
+    SPECIMEN_STATUS: 'blood-morphology-specimen-status',
     EDITED_CELLS_PREFIX: 'editedCells:',
-    // v2 新增：session token（登入/登出用）
-    SESSION_TOKEN: 'bhm_session_token',
-    SESSION_USER: 'bhm_session_user',
+    EDITED_DIFF_PREFIX: 'editedDiff:',                         // 人員編輯值（review.editedDiff）
+    LIS_WRITEBACK_LOG: 'blood-morphology-lis-writeback-log',   // 規則 14 原型的 LIS 回寫紀錄
+    // ── 跨頁一次性訊息（sessionStorage）
+    REVIEW_RETURN_MODE: 'blood-morphology-review-return-list-mode',
+    TOAST_MANUAL_REVIEW: 'blood-morphology-manual-alert-toast',
+    TOAST_FOLLOW_UP_DONE: 'blood-morphology-follow-up-done-toast',
+    TOAST_REPORT_VERIFIED: 'blood-morphology-report-verified-toast',
+    // ── 展示用（demo/ 資料夾）
+    USABILITY_SCENARIO: 'blood-morphology-usability-scenario',
   }),
 
 });

@@ -6,12 +6,9 @@
  *  2. 閒置自動登出計時器
  *  3. 頁面守衛（未登入時導回登入頁）
  *
- * 問題修正（對比原版 login.js）：
- *  - 原版：帳號密碼直接寫死在前端 JS → 任何人打開 DevTools 即可看到
- *  - 原版：用 localStorage 存登入狀態 → XSS 可竊取、跨分頁永久存活
- *  - 修正：帳密驗證移至後端；前端只存 JWT Token 於 sessionStorage（分頁關閉即清除）
- *  - 修正：加入 CSRF Token（真實後端需配合）
- *  - 修正：閒置 30 分鐘自動登出
+ * 設計：
+ *  - 帳密驗證在後端（原型以 ApiService 模擬路由代替）；前端只存 Token 於 sessionStorage（分頁關閉即清除）
+ *  - 閒置 30 分鐘自動登出（文件 1.1 節「登入」）
  */
 
 const AuthService = (function () {
@@ -35,8 +32,8 @@ const AuthService = (function () {
     try {
       sessionStorage.removeItem(cfg.TOKEN_STORAGE_KEY);
       sessionStorage.removeItem(cfg.USER_KEY);
-      // 同步清除原版 common.js 使用的 key
-      sessionStorage.removeItem(cfg.LEGACY_USER_KEY);
+      // 登入帳號（簽核時寫入編輯人員）
+      sessionStorage.removeItem(cfg.USER_ACCOUNT_KEY);
     } catch { /* ignore */ }
   }
 
@@ -127,7 +124,7 @@ const AuthService = (function () {
   }
 
   /**
-   * 取得目前登入使用者
+   * 取得目前登入使用者（預留：正式系統後端回傳 { id, name, role }；原型尚未使用）
    * @returns {{id: string, name: string, role: string} | null}
    */
   function getCurrentUser() {

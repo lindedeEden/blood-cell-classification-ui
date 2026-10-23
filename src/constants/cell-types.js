@@ -1,43 +1,41 @@
 /**
- * CellConstants — 所有與細胞類型相關的常數
+ * CellConstants — 細胞類別、資料欄位對照與表格列定義（唯一來源）
  *
- * 問題修正：
- *  - 原版：ABNORMAL_ORDER、DEFAULT_CATEGORY_ORDER、CATEGORY_TO_METRIC_KEY 等
- *          陣列/物件定義在 image-review.js 的 IIFE 內（私有），
- *          report-issue.js 又重複定義了 COMMON_ROWS / ABNORMAL_ROWS，
- *          造成維護兩份清單、容易不同步。
- *  - 修正：單一來源，各頁面引用同一常數。
+ * 影像檢視、報告核發、檢體管理三頁都從這裡取用，不再各自定義清單。
+ * 細胞類別名稱（例如 'Segmented Neutrophil'）＝影像檢視頁的分類名稱；
+ * 欄位 key（例如 'segmentedNeutrophil'）＝檢體的 imaging.aiDiff（AI 值）、lis.prevReport.diff（前次報告）、review.editedDiff（人員編輯值）的欄位。
  */
 
-const CellConstants = Object.freeze({
+const CellConstants = (function () {
+  'use strict';
 
-  // 成熟細胞（用於 100 格計數）
-  MATURE_TYPES: Object.freeze([
-    'Segmented Neutrophil', 'Band', 'Eosinophil', 'Monocyte',
-    'Basophil', 'Lymphocyte', 'Atypical Lymphocyte',
-  ]),
-
-  // 未成熟 / 異常細胞
-  ABNORMAL_TYPES: Object.freeze([
-    'Blast', 'Promyelocyte', 'Myelocyte', 'Metamyelocyte',
-    'Hypersegmented', 'Promonocyte', 'Plasma Cell', 'Abnormal Lymphocyte',
-    'Megakaryocyte',
-  ]),
-
-  // 其他發現
-  OTHER_TYPES: Object.freeze(['NRBC', 'Giant PLT', 'Smudge Cell', 'Unidentified', 'Artefact']),
-
-  // 影像檢視分類區預設排序
-  DISPLAY_ORDER: Object.freeze([
+  /** 影像檢視頁細胞區塊的預設排序（成熟細胞 → 異常細胞 → 非白血球 → 待分類） */
+  const REVIEW_CATEGORY_ORDER = Object.freeze([
     'Band', 'Segmented Neutrophil', 'Eosinophil', 'Monocyte', 'Basophil',
     'Lymphocyte', 'Atypical Lymphocyte', 'Abnormal Lymphocyte',
     'Blast', 'Promyelocyte', 'Myelocyte', 'Metamyelocyte', 'Hypersegmented',
-    'Promonocyte', 'Plasma Cell', 'Megakaryocyte', 'NRBC', 'Giant PLT',
-    'Smudge Cell', 'Unidentified', 'Artefact',
-  ]),
+    'Promonocyte', 'Plasma Cell', 'Megakaryocyte',
+    'NRBC', 'Giant PLT', 'Smudge Cell', 'Unidentified', 'Artefact',
+  ]);
 
-  // UI 顯示名稱 → DB metrics key
-  CATEGORY_TO_METRIC_KEY: Object.freeze({
+  /**
+   * 非白血球類別（規則 8）：
+   * - 不計入白血球分類百分比的分母
+   * - 本身也以 % 呈現，分母＝白血球總數（例：白血球 100 顆、NRBC 2 顆 → 2%），於報告核發「其他發現」（第 6 節）
+   * Unidentified 不在此列：儲存前必須為 0（規則 8），閱片中視為待分類白血球計入分母。
+   */
+  const NON_WBC_TYPES = Object.freeze(['NRBC', 'Giant PLT', 'Megakaryocyte', 'Smudge Cell', 'Artefact']);
+
+  /** 細胞類別 → 資料欄位 key（Unidentified 沒有對應欄位） */
+  const CATEGORY_TO_METRIC_KEY = Object.freeze({
+    'Band': 'band',
+    'Segmented Neutrophil': 'segmentedNeutrophil',
+    'Eosinophil': 'eosinophil',
+    'Monocyte': 'monocyte',
+    'Basophil': 'basophil',
+    'Lymphocyte': 'lymphocyte',
+    'Atypical Lymphocyte': 'atypicalLymphocyte',
+    'Abnormal Lymphocyte': 'abnormalLymphocyte',
     'Blast': 'blast',
     'Promyelocyte': 'promyelocyte',
     'Myelocyte': 'myelocyte',
@@ -45,55 +43,75 @@ const CellConstants = Object.freeze({
     'Hypersegmented': 'hypersegmented',
     'Promonocyte': 'promonocyte',
     'Plasma Cell': 'plasmaCell',
-    'Abnormal Lymphocyte': 'abnormalLymphocyte',
-    'Atypical Lymphocyte': 'atypicalLymphocyte',
-    'Lymphocyte': 'lymphocyte',
-    'Monocyte': 'monocyte',
-    'Eosinophil': 'eosinophil',
-    'Basophil': 'basophil',
-    'Band': 'band',
-    'Segmented Neutrophil': 'segmentedNeutrophil',
+    'Megakaryocyte': 'megakaryocyte',
     'NRBC': 'nrbc',
     'Giant PLT': 'giantPlt',
-    'Megakaryocyte': 'megakaryocyte',
     'Smudge Cell': 'smudgeCell',
     'Artefact': 'artefact',
-  }),
+  });
 
-  // metrics key → 中文顯示標籤（報告頁、門檻設定頁使用）
-  METRIC_LABELS: Object.freeze({
-    wbc: 'WBC (×10³/μL)',
-    plt: 'PLT (×10³/μL)',
-    band: 'Band (%)',
-    segmentedNeutrophil: 'Segmented Neutrophil (%)',
-    eosinophil: 'Eosinophil (%)',
-    monocyte: 'Monocyte (%)',
-    basophil: 'Basophil (%)',
-    lymphocyte: 'Lymphocyte (%)',
-    atypicalLymphocyte: 'Atypical Lymphocyte (%)',
-    blast: 'Blast',
-    promyelocyte: 'Promyelocyte',
-    myelocyte: 'Myelocyte (%)',
-    metamyelocyte: 'Metamyelocyte (%)',
-    hypersegmented: 'Hypersegmented (%)',
-    promonocyte: 'Promonocyte',
-    plasmaCell: 'Plasma Cell',
-    abnormalLymphocyte: 'Abnormal Lymphocyte',
-    nrbc: 'NRBC',
-    giantPlt: 'Giant PLT',
-    megakaryocyte: 'Megakaryocyte',
-    smudgeCell: 'Smudge Cell',
-    artefact: 'Artefact',
-  }),
+  /** 「分析與歷史報告」表格列（檢體管理右側摘要、影像檢視左側共用）：[顯示名稱, 欄位 key] */
+  const ANALYSIS_ROWS = Object.freeze([
+    ['WBC (10e9/L)', 'wbc'],
+    ['PLT (10e9/L)', 'plt'],
+    ['Band (%)', 'band'],
+    ['Segmented neutrophil (%)', 'segmentedNeutrophil'],
+    ['Eosinophil (%)', 'eosinophil'],
+    ['Monocyte (%)', 'monocyte'],
+    ['Basophil (%)', 'basophil'],
+    ['Lymphocyte (%)', 'lymphocyte'],
+    ['Atypical lymphocyte (%)', 'atypicalLymphocyte'],
+    ['Blast (%)', 'blast'],
+    ['Promyelocyte (%)', 'promyelocyte'],
+    ['Myelocyte (%)', 'myelocyte'],
+    ['Metamyelocyte (%)', 'metamyelocyte'],
+    ['Hypersegmented (%)', 'hypersegmented'],
+    ['Promonocyte (%)', 'promonocyte'],
+    ['Plasma cell (%)', 'plasmaCell'],
+    ['Abnormal lymphocyte (%)', 'abnormalLymphocyte'],
+  ]);
 
-  // 狀態膠囊：key → { label, colorClass }
-  STATUS_CONFIG: Object.freeze({
-    'PLT Check':      { label: '血小板確認',   color: 'bg-blue-100 text-blue-800' },
-    'Digital Review': { label: '數位閱片',     color: 'bg-purple-100 text-purple-800' },
-    'AI Alert':       { label: 'AI分類警示',   color: 'bg-orange-100 text-orange-800' },
-    'Follow-up':      { label: '需拉片確認',   color: 'bg-red-100 text-red-800' },
-    'Verified':       { label: '已完成',       color: 'bg-green-100 text-green-800' },
-    'Locked':         { label: '鎖定中',       color: 'bg-gray-200 text-gray-800 border border-gray-300' },
-  }),
+  /** 報告核發頁表格列：[顯示名稱, 欄位 key] */
+  const REPORT_ROWS = Object.freeze({
+    COMMON: Object.freeze([
+      ['Band', 'band'],
+      ['Segmented neutrophil', 'segmentedNeutrophil'],
+      ['Eosinophil', 'eosinophil'],
+      ['Monocyte', 'monocyte'],
+      ['Basophil', 'basophil'],
+      ['Lymphocyte', 'lymphocyte'],
+      ['Atypical lymphocyte', 'atypicalLymphocyte'],
+    ]),
+    ABNORMAL: Object.freeze([
+      ['Blast', 'blast'],
+      ['Promyelocyte', 'promyelocyte'],
+      ['Myelocyte', 'myelocyte'],
+      ['Metamyelocyte', 'metamyelocyte'],
+      ['Hypersegmented', 'hypersegmented'],
+      ['Promonocyte', 'promonocyte'],
+      ['Plasma cell', 'plasmaCell'],
+      ['Abnormal lymphocyte', 'abnormalLymphocyte'],
+    ]),
+    /** 其他發現（非白血球；% ＝該類顆數 ÷ 白血球總數） */
+    OTHER: Object.freeze([
+      ['NRBC', 'nrbc'],
+      ['Giant PLT', 'giantPlt'],
+      ['Megakaryocyte', 'megakaryocyte'],
+      ['Smudge cell', 'smudgeCell'],
+      ['Artefact', 'artefact'],
+    ]),
+  });
 
-});
+  function isNonWbcCategory(category) {
+    return NON_WBC_TYPES.indexOf(category) !== -1;
+  }
+
+  return Object.freeze({
+    REVIEW_CATEGORY_ORDER: REVIEW_CATEGORY_ORDER,
+    NON_WBC_TYPES: NON_WBC_TYPES,
+    CATEGORY_TO_METRIC_KEY: CATEGORY_TO_METRIC_KEY,
+    ANALYSIS_ROWS: ANALYSIS_ROWS,
+    REPORT_ROWS: REPORT_ROWS,
+    isNonWbcCategory: isNonWbcCategory,
+  });
+})();

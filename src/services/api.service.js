@@ -1,18 +1,16 @@
 /**
- * ApiService — HTTP / Mock API 抽象層
+ * ApiService — 前端與後端之間的唯一 HTTP 出入口
  *
- * 責任：
- *  - 統一所有 HTTP 請求的進出口（單一責任）
- *  - 開發環境自動切換至 Mock 資料，不需後端
- *  - 所有請求自動附加 JWT Authorization Header
- *  - 統一錯誤格式：{ code, message, detail }
- *  - 處理 401 自動登出、網路逾時、重試
+ *  - AppConfig.ENV = 'development'：使用下方「模擬路由」回應，不需要後端
+ *  - AppConfig.ENV = 'production'：呼叫 AppConfig.API_BASE_URL 的真實 REST API
+ *  - 自動附加登入 Token（Authorization: Bearer）、逾時處理、統一錯誤格式 { code, message, detail }
  *
- * 問題修正（對比原版）：
- *  - 原版：沒有 API 層，所有「資料」直接來自全域 JS 變數 APP_DATABASE
- *  - 原版：新增/修改狀態只存 localStorage，重新整理後可能丟失
- *  - 原版：無法與真實後端整合
- *  - 修正：透過此層，前端程式碼不需要知道「現在是 Mock 還是真實 API」
+ * 目前原型實際呼叫的路由：
+ *  POST /auth/login、POST /auth/logout             登入／登出（AuthService）
+ *  POST /lis/results                                簽核後回寫 WBC Diff%、非白血球數據（規則 14）
+ *  POST /lis/notes                                  回寫 LIS 檢驗註記：需拉片確認（規則 10）、拉片完成、血小板確認完成、數位閱片替代拉片鏡檢（規則 14）
+ * 正式系統規劃的其他路由（檢體、流程狀態、門檻設定等）列於 ARCHITECTURE.md；
+ * 原型只用到 POST，get／patch／put／delete 為串接預留。
  */
 
 const ApiService = (function () {
@@ -36,8 +34,12 @@ const ApiService = (function () {
 
   function _handleHttpError(status, body) {
     if (status === 401) {
-      if (typeof AuthService !== 'undefined') AuthService.logout();
-      throw { code: 'UNAUTHORIZED', message: '認證已過期，請重新登入' };
+      // 已登入者收到 401＝登入逾期，自動登出；尚未登入（例如帳密錯誤）則只回傳錯誤訊息
+      if (typeof AuthService !== 'undefined' && AuthService.getToken()) {
+        AuthService.logout();
+        throw { code: 'UNAUTHORIZED', message: '認證已過期，請重新登入' };
+      }
+      throw { code: 'UNAUTHORIZED', message: body?.message || '帳號或密碼錯誤' };
     }
     if (status === 403) throw { code: 'FORBIDDEN', message: '您沒有執行此操作的權限' };
     if (status === 404) throw { code: 'NOT_FOUND', message: '找不到請求的資源' };
@@ -71,9 +73,9 @@ const ApiService = (function () {
     return _fetchWithTimeout(url, options);
   }
 
-  // ─── Mock 路由（開發模式）───────────────────────────────────
+  // ─── 模擬路由（開發模式）─────────────────────────────────────
   // 格式：{ method, pattern: RegExp, handler(matches, body) }
-  // 上線時刪除此區塊即可，其他程式碼不需任何更改。
+  // 上線時刪除此區塊即可，其他程式碼不需更改。
 
   const _mockRoutes = [
     {
@@ -88,22 +90,9 @@ const ApiService = (function () {
         await _mockDelay(300);
         const acc = DEMO_ACCOUNTS[body.account];
         if (acc && acc.password === body.password) {
-          // 同步寫入原版 common.js 讀取的 sessionStorage key，確保 Demo 中編輯人員顯示正常
-          try { sessionStorage.setItem('blood-morphology-user-account', body.account); } catch {}
-          // 原版登入時的 Demo 重設邏輯：清除檢體狀態覆寫，重新讀取 database.js 原始資料
-          try {
-            // 重置 Demo 狀態（每次登入還原原始資料）
-            sessionStorage.setItem('blood-morphology-specimen-ui-reset', '1');
-            sessionStorage.removeItem('_mock_db_v2');   // 清除 v2 Mock DB 快取
-            localStorage.removeItem('blood-morphology-specimen-status');
-            // 清除所有細胞編輯快照
-            const keysToRemove = [];
-            for (let i = 0; i < localStorage.length; i++) {
-              const k = localStorage.key(i);
-              if (k && (k.startsWith('editedCells:') || k.startsWith('editedMetrics:'))) keysToRemove.push(k);
-            }
-            keysToRemove.forEach(k => localStorage.removeItem(k));
-          } catch {}
+          // Demo：記下登入帳號（簽核時寫入編輯人員），並重設檢體狀態為 database.js 原始資料
+          DemoStorage.setCurrentUserAccount(body.account);
+          DemoStorage.resetDemoData();
           return { token: 'mock_jwt_' + Date.now(), user: acc.user };
         }
         _handleHttpError(401, { message: '帳號或密碼錯誤' });
@@ -114,96 +103,28 @@ const ApiService = (function () {
       handler: async () => { await _mockDelay(50); return { ok: true }; }
     },
     {
-      method: 'GET', pattern: /^\/specimens(\?.*)?$/,
-      handler: async (matches) => {
-        await _mockDelay(200);
-        const db = _getMockDb();
-        return { data: db.specimens, total: db.specimens.length };
-      }
-    },
-    {
-      method: 'GET', pattern: /^\/specimens\/([^/]+)$/,
-      handler: async (matches) => {
-        await _mockDelay(150);
-        const db = _getMockDb();
-        const spec = db.specimens.find(s => s.id === matches[1]);
-        if (!spec) _handleHttpError(404, {});
-        return spec;
-      }
-    },
-    {
-      method: 'PATCH', pattern: /^\/specimens\/([^/]+)\/workflow$/,
-      handler: async (matches, body) => {
-        await _mockDelay(200);
-        const db = _getMockDb();
-        const spec = db.specimens.find(s => s.id === matches[1]);
-        if (!spec) _handleHttpError(404, {});
-        Object.assign(spec, body);
-        _saveMockDb(db);
-        return { ok: true, specimen: spec };
-      }
-    },
-    {
-      method: 'PATCH', pattern: /^\/specimens\/([^/]+)\/cells$/,
-      handler: async (matches, body) => {
-        await _mockDelay(200);
-        const db = _getMockDb();
-        const spec = db.specimens.find(s => s.id === matches[1]);
-        if (!spec) _handleHttpError(404, {});
-        spec.editedMetrics = body.metrics;
-        spec.editedCells = body.cells;
-        _saveMockDb(db);
-        return { ok: true };
-      }
-    },
-    {
-      method: 'GET', pattern: /^\/settings\/thresholds$/,
-      handler: async () => {
-        await _mockDelay(100);
-        return AppConfig.DEFAULT_LEAVE_THRESHOLDS;
-      }
-    },
-    {
-      method: 'PUT', pattern: /^\/settings\/thresholds$/,
+      // 規則 14：簽核後回寫 WBC Diff%、非白血球數據（Demo 模擬；正式系統由後端寫入 LIS）
+      method: 'POST', pattern: /^\/lis\/results$/,
       handler: async (_, body) => {
-        await _mockDelay(150);
-        return { ok: true, thresholds: body };
+        await _mockDelay(200);
+        return { ok: true, barcode: body && body.barcode, syncedAt: new Date().toISOString() };
       }
     },
     {
-      method: 'POST', pattern: /^\/ai\/classify$/,
+      // 規則 10、14：回寫 LIS 檢驗註記（需拉片確認／拉片完成／血小板確認完成／數位閱片替代拉片鏡檢）（Demo 模擬）
+      method: 'POST', pattern: /^\/lis\/notes$/,
       handler: async (_, body) => {
-        // 未來整合真實 AI API 時，此處替換為後端 AI Proxy 的呼叫
-        await _mockDelay(800);
+        await _mockDelay(200);
         return {
-          results: (body.cells || []).map(cell => ({
-            cellId: cell.id,
-            prediction: cell.currentCategory,
-            confidence: 0.92,
-            alternatives: []
-          }))
+          ok: true,
+          barcode: body && body.barcode,
+          patientId: body && body.patientId,
+          note: body && body.note,
+          syncedAt: new Date().toISOString(),
         };
       }
     },
   ];
-
-  function _getMockDb() {
-    // Demo 狀態存於 sessionStorage（而非 localStorage）
-    try {
-      const raw = sessionStorage.getItem('_mock_db_v2');
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    // 首次：複製原始資料（需 APP_DATABASE 已載入）
-    const db = { specimens: JSON.parse(JSON.stringify(
-      (typeof APP_DATABASE !== 'undefined') ? APP_DATABASE.specimens : []
-    ))};
-    _saveMockDb(db);
-    return db;
-  }
-
-  function _saveMockDb(db) {
-    try { sessionStorage.setItem('_mock_db_v2', JSON.stringify(db)); } catch {}
-  }
 
   function _mockDelay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -221,6 +142,7 @@ const ApiService = (function () {
 
   // ─── 公開 API ────────────────────────────────────────────────
 
+  // get／patch／put／delete：原型尚未使用，預留給正式系統規劃的路由（ARCHITECTURE.md：GET /specimens、PATCH …/workflow、PUT …/edited-result）
   async function get(path) {
     return IS_MOCK ? _mockRequest('GET', path) : _realRequest('GET', path);
   }

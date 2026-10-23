@@ -1,255 +1,290 @@
-# 血球分類軟體 — 系統架構優化報告
+# 程式架構說明
 
-> 作者：系統架構審查  
-> 日期：2026-06-09  
-> 對象：林口長庚醫院 檢驗醫學部開發團隊  
-
----
-
-## 一、現有版本問題診斷
-
-以下問題若進入正式上線環境，可能導致**資安事件、資料遺失、HIPAA/個資法違規**。
+> 對象：工程團隊／之後維護原型的人
+> 更新：2026-10-20（架構整理後的實際狀態）
+> 規則內容請以《邏輯規則說明文件》為準；本文件只說明「規則寫在哪個檔案、檔案之間怎麼串」。
+> 程式註解與測試名稱中的「規則 N」對應《邏輯規則說明文件》v5.x 的規則 1～15（依處理流程排序；登入不編規則號，見 1.1 節）。
 
 ---
 
-### 🔴 高風險問題
+## 1. 定位
 
-#### 1. 帳號密碼硬寫在前端 JavaScript
+這是**前端原型**：沒有後端，檢體資料由 `assets/data/sources/` 的四份模擬資料（CellaVision 資料庫的 DI-60 影像、AI 模型（林口人工智慧中心）的辨識結果、WAM、LIS）依條碼合併而成（`database.js`），操作結果存在瀏覽器（localStorage／sessionStorage）。
 
-**原始碼位置：** `assets/js/login.js` 第 35 行
+程式分成三種性質，放在不同資料夾：
 
-```js
-// 原版
-if ((account === 'admin' && password === 'admin') || (account === 'user' && password === 'user')) {
-```
-
-**問題：** 任何人開啟瀏覽器 DevTools → Sources，即可看到所有有效帳密。  
-**風險等級：** 🔴 嚴重（等同公開帳密）  
-**修正方案：** 帳密驗證移至後端；前端只傳帳密給 `/auth/login` API，後端回傳 JWT Token。
+| 性質 | 資料夾 | 正式系統 |
+|------|--------|----------|
+| 規則、設定、常數、API 介面（不碰畫面） | `src/` | **可直接沿用**或照著移植到後端 |
+| 畫面程式、瀏覽器儲存、模擬資料 | `assets/` | 依正式系統的前端技術重寫；`assets/data/` 改由後端 API 提供 |
+| 展示用（教學導覽、情境模擬測試） | `demo/` | **不需要**，整個資料夾可移除 |
 
 ---
 
-#### 2. 所有病患資料在登入前即載入至前端
+## 2. 資料夾結構
 
-**原始碼位置：** 各 HTML 頁面的 `<script src="assets/data/database.js">`
+```text
+index.html                     登入
+檢體管理.html                  檢體清單、篩選、留單標準設定
+影像檢視與細胞編輯.html        細胞影像閱片與重新歸類
+報告核發.html                  報告簽核（通常以 iframe 嵌在影像檢視頁）
 
-```html
-<!-- 登入頁（index.html）也載入了 database.js！ -->
-<script src="assets/data/database.js?v=..."></script>
-```
+src/                           ── 規則與服務（不含畫面程式）
+  config/config.js             AppConfig：環境、API 位址、留單門檻預設值、頁面檔名、儲存 key
+  constants/cell-types.js      CellConstants：細胞類別、類別↔欄位對照、各表格的列定義
+  constants/status.js          StatusConstants：狀態膠囊名稱、顏色、模式預設篩選
+  rules/intake-merge.js        IntakeMerge：進線與合併（第 2 節）：依條碼合併 CellaVision 影像、AI 模型、WAM、LIS
+  rules/leave-rules.js         LeaveRules：留單判斷（第 3 節、規則 1）
+  rules/workflow-rules.js      WorkflowRules：膠囊、工作分流、簽核與完成（第 3、4、6～8 節）
+  services/api.service.js      ApiService：HTTP 出入口；開發模式使用模擬路由
+  services/auth.service.js     AuthService：登入、登出、閒置登出、頁面登入檢查
+  services/ai-model.service.js AiModelService：AI 模型（林口人工智慧中心）讀取 CellaVision 影像、逐顆預分類（原型為模擬）
 
-**問題：** 包含 17 筆病患完整 PHI（姓名、生日、病歷號、所有血液檢驗值）的 `database.js` 在登入頁就載入，任何未登入者直接在 DevTools 即可讀取所有病患資料。  
-**風險等級：** 🔴 嚴重（PHI 資料洩漏 / 個資法違規）  
-**修正方案：** 登入頁不載入任何病患資料；資料透過登入後的 API 請求取得，並在後端做存取控制。
+assets/
+  css/common.css               共用樣式
+  data/sources/cellavision-db.js  模擬 CellaVision 資料庫（SOURCE_CELLAVISION）：DI-60 拍的細胞影像（每顆 cellId、影像路徑）、機台、歸位、分析時間
+  data/sources/ai-model-mock.js  AI 模型模擬設定（AI_MODEL_MOCK_SETTINGS）：範例圖資料夾→類別、信心值、指定誤判、沿用研究數值的檢體
+  data/sources/wam.js          模擬來源 WAM（SOURCE_WAM）：CBC、Flow DC、CBC flag、Flow DC flag、PLT flag、SIS rule
+  data/sources/lis.js          模擬來源 LIS（SOURCE_LIS）：病患資料、前次報告、需推片確認註記
+  data/database.js             進線後的檢體（APP_DATABASE）＝四份資料合併結果＋展示用狀態（DEMO_STATE）
+  images/cells/                細胞範例圖片
+  js/core/                     ── 各頁共用
+    ui-preload.js              <head> 最先執行：先套用字級與縮放，避免畫面跳動
+    storage.js                 DemoStorage：所有瀏覽器儲存的唯一出入口
+    lis-sync.js                LisSync：結果回傳 LIS（Diff%、非白血球、檢驗註記；規則 10、14）
+    specimen-store.js          SpecimenStore：檢體資料存取與狀態變更動作
+    navigation.js              AppNav：頁面跳轉
+    ui-common.js               AppUi：字級、縮放、狀態膠囊、分析表資料
+  js/pages/                    ── 各頁專屬
+    login.js / specimen-list.js / image-review.js / report-issue.js
 
----
+demo/                          ── 展示用，可整個移除
+  tutorial.js, tutorial.css    使用教學（步驟式導覽）
+  usability-study.js           情境模擬測試（可用性研究）
+  usability-scenarios.js       各情境的檢體清單與任務說明
 
-#### 3. 工作流程狀態只存 localStorage，無後端持久化
-
-**原始碼位置：** `assets/js/common.js` — `persistSpecimenStatusOverride()`
-
-```js
-// 原版：狀態只存在本機瀏覽器
-localStorage.setItem(APP_SPECIMEN_STATUS_STORAGE_KEY, JSON.stringify(map));
-```
-
-**問題：**
-- 使用者更換電腦或清除瀏覽器資料 → 所有工作進度消失
-- 多人操作同一檢體 → 各自看到不同狀態，無法協同
-- localStorage 可被同源的其他 JS（含 XSS 注入）讀取
-
-**風險等級：** 🔴 嚴重（資料一致性與合規稽核）  
-**修正方案：** 每次狀態變更透過 `PATCH /specimens/{id}/workflow` 送至後端資料庫。
-
----
-
-### 🟠 中風險問題
-
-#### 4. 沒有 API 抽象層
-
-原版所有「資料存取」直接讀寫全域變數 `APP_DATABASE`（JavaScript 物件）。若未來要串接真實儀器資料或 EMR，需要修改所有頁面的所有相關程式碼。
-
-**修正方案：** 建立 `ApiService`（已實作），所有資料存取透過此層，切換真實後端只需改 `AppConfig.ENV = 'production'`。
-
----
-
-#### 5. 業務邏輯分散三處，互相耦合
-
-| 原版位置 | 包含邏輯 |
-|---|---|
-| `common.js` | 留單門檻、工作流程計算、localStorage 讀寫、DOM navigation |
-| `image-review.js` | 細胞顯示 + 工作流程判斷 + 狀態寫入 |
-| `report-issue.js` | 報告顯示 + 工作流程判斷 + 狀態寫入 |
-
-同一個「留單門檻判斷」邏輯在三個檔案中各有一份，修改時需同步三處，容易遺漏。
-
-**修正方案：** 建立 `SpecimenService`（已實作），集中所有業務規則。
-
----
-
-#### 6. 全域命名空間汙染
-
-原版所有函式（`getSpecimenById`, `isDigitalReviewDone`, `parseMetricNum`...）直接掛在 `window` 全域物件。17 個全域函式 + 6 個全域變數，一旦引入第三方套件極易命名衝突。
-
-**修正方案：** 使用 IIFE + 模組模式，只暴露必要介面（`AuthService`, `ApiService` 等）。
-
----
-
-#### 7. 無閒置自動登出
-
-原版登入後 session 永遠存活（sessionStorage 只在分頁關閉時清除，但若分頁不關閉則永遠登入）。
-
-**修正方案：** `AuthService` 已實作 30 分鐘閒置計時器，到時自動呼叫 `logout()`。
-
----
-
-### 🟡 低風險（可用性問題）
-
-#### 8. 留單門檻只存 localStorage，系統設定頁修改只影響當前電腦
-
-管理員在一台電腦調整留單門檻 → 只有那台電腦的 localStorage 被修改 → 其他電腦看到的仍是預設值。
-
-**修正方案：** 門檻設定存後端資料庫，透過 `GET /settings/thresholds` 讓所有用戶端取得一致設定。
-
----
-
-#### 9. 細胞分類常數重複定義
-
-`ABNORMAL_ORDER` 在 `image-review.js` 定義；`COMMON_ROWS`/`ABNORMAL_ROWS` 在 `report-issue.js` 重複定義。
-
-**修正方案：** 統一至 `src/constants/cell-types.js`，各頁面引用。
-
----
-
-## 二、優化版架構說明
-
-### 資料夾結構
-
-```
-血球分類軟體介面設計專案/
-├── index.html                    # 登入頁（不含病患資料）
-├── 檢體管理.html                  # 登入後才載入，受 requireAuth() 保護
-├── 影像檢視與細胞編輯.html
-├── 報告核發.html
-│
-├── src/
-│   ├── config/
-│   │   └── config.js             # 所有可調整設定的唯一來源
-│   │
-│   ├── constants/
-│   │   └── cell-types.js         # 細胞類型、順序、標籤常數（單一來源）
-│   │
-│   ├── services/
-│   │   ├── api.service.js        # HTTP 抽象層（Mock ↔ 真實 API 切換）
-│   │   ├── auth.service.js       # 登入/登出/Token/閒置登出
-│   │   └── specimen.service.js   # 檢體業務邏輯（留單判定/工作流程）
-│   │
-│   ├── store/
-│   │   └── app.store.js          # 集中式狀態 + Pub/Sub 通知
-│   │
-│   └── utils/
-│       └── validators.js         # 輸入驗證（前端）
-│
-└── assets/
-    ├── css/
-    ├── data/                     # Mock 資料（開發用，上線時移除）
-    └── images/
-```
-
-### 依賴關係（載入順序）
-
-```
-config.js
-    └── constants/cell-types.js
-            └── services/api.service.js
-                    └── services/auth.service.js
-                    └── services/specimen.service.js
-                            └── store/app.store.js
-                                    └── utils/validators.js
-                                            └── [頁面腳本]
+tests/run-tests.js             規則單元測試（node 執行）
+tests/state-space.js           列舉所有膠囊狀態與工作分流（node tests/state-space.js）
 ```
 
 ---
 
-## 三、AI API 整合路徑
+## 3. 分層與載入順序
 
-現版本的「AI Alert」是靜態硬編資料。以下是導入真實 AI 的建議路徑：
+每個業務頁面依下列順序載入（HTML 內已用註解分段）：
 
-### 架構原則：前端永遠不直接呼叫 AI 廠商 API
-
-```
-瀏覽器 → 後端 AI Proxy → AI 廠商 API（OpenAI / Claude / 自建模型）
-                ↑
-         在這裡做：
-         - API Key 保護（不暴露給前端）
-         - 請求速率限制
-         - 結果快取
-         - 稽核日誌
+```text
+1. src/        config → cell-types → status → leave-rules → workflow-rules → intake-merge → api.service → auth.service → ai-model.service
+2. 登入檢查    AuthService.requireAuth()（未登入導回 index.html）
+3. 模擬資料    sources/cellavision-db → sources/ai-model-mock → sources/wam → sources/lis → database.js
+4. demo/       usability-scenarios → usability-study → tutorial（可整段移除）
+5. core/       storage → lis-sync → specimen-store → navigation → ui-common
+6. 本頁程式    pages/*.js
 ```
 
-### 前端整合方式（已在 ApiService 預留）
+依賴方向只能「往上」：下層不知道上層存在。
 
-```js
-// 前端只呼叫自己後端的 proxy endpoint
-const result = await ApiService.post('/ai/classify', {
-  cells: cellsToClassify,   // 送出細胞圖片 URL 或 base64
-  specimenId: currentId,
-});
-
-// 後端回傳標準格式
-// {
-//   results: [
-//     { cellId, prediction, confidence, alternatives: [{category, confidence}] }
-//   ]
-// }
+```text
+pages/*.js ──► core/ ──► src/rules ──► src/constants ──► src/config
+     │            │
+     └────────────┴──► demo/（只在存在時使用：typeof UsabilityStudy !== 'undefined'）
 ```
 
-### 低信心值警告（已在 config.js 設定）
+- `src/rules/` 是**純邏輯**：只讀寫傳入的檢體物件，不碰畫面、不碰瀏覽器儲存，所以可以在 Node 測試。
+- `SpecimenStore` 在載入時就完成初始化（套用門檻、計算 AI Alert、讀回已保存狀態），頁面拿到的檢體都是最新狀態。
+- `demo/usability-study.js` 必須在 `specimen-store.js` 之前載入：它在載入時先記下情境檢體的原始資料，套用情境時用來還原。
 
-```js
-AppConfig.AI.CONFIDENCE_THRESHOLD = 0.80
-// 信心值 < 80% 時，UI 顯示「低信心警告」，要求人工確認
+---
+
+## 4. 各模組職責與對應規則
+
+| 模組 | 全域名稱 | 負責 | 主要規則 |
+|------|----------|------|----------|
+| `config.js` | `AppConfig` | 所有可調整設定（唯一來源） | 規則 1（留單門檻）、規則 7（門檻設定）、第 4 節（時效） |
+| `cell-types.js` | `CellConstants` | 細胞類別順序、非白血球、類別↔欄位對照、表格列 | 規則 8（第 5、6 節） |
+| `status.js` | `StatusConstants` | 狀態膠囊名稱／顏色、實體標籤、模式預設篩選 | 3.1 節、第 4 節 |
+| `intake-merge.js` | `IntakeMerge` | 依條碼合併 CellaVision 影像、AI 模型 結果、WAM、LIS 成檢體；逐顆影像＋預分類對應；AI 分類結果（Diff%）計算；條碼正規化、缺來源／格式不符／重複列為進線異常 | 第 2 節、附錄 A #3 |
+| `leave-rules.js` | `LeaveRules` | 門檻、年齡（LIS）、單項判定、新發／延續、橫幅、AI Alert 條件、判定用數值 | 規則 1、4 |
+| `workflow-rules.js` | `WorkflowRules` | 流程旗標、完成判定、唯讀、清單歸屬、篩選與排序、簽核／改人工鏡檢後的狀態 | 規則 1、5、9～13（第 4 節） |
+| `api.service.js` | `ApiService` | HTTP、Token、逾時、錯誤格式；開發模式模擬路由 | 第 11 節 |
+| `auth.service.js` | `AuthService` | 登入、登出、閒置 30 分鐘登出、頁面登入檢查 | 1.1 節（登入） |
+| `storage.js` | `DemoStorage` | localStorage／sessionStorage 讀寫（key 見 7 節） | 規則 7（Demo） |
+| `lis-sync.js` | `LisSync` | 結果回傳 LIS：簽核 → WBC Diff%、非白血球數據；改為人工鏡檢 → 「需拉片確認」；需拉片確認／血小板確認完成 → 「拉片完成」／「血小板確認完成」註記；開鎖直接核發 → 「數位閱片替代拉片鏡檢」 | 規則 10、14 |
+| `specimen-store.js` | `SpecimenStore` | 取檢體、保存狀態、動作：簽核、改人工鏡檢、拉片完成、切換實體標籤、LIS 撤回後回到進線狀態（withdrawFromLis，介面無按鈕）、儲存人員編輯結果 | 規則 1、8～12、15 |
+| `navigation.js` | `AppNav` | 頁面網址與跳轉、返回清單時還原模式 | — |
+| `ui-common.js` | `AppUi` | 字級、縮放、膠囊顯示資訊、分析表資料、前次報告欄標 | 第 4～6 節 |
+
+**新增或修改規則時：**
+- 判斷邏輯 → `src/rules/`，並在 `tests/run-tests.js` 加測試案例
+- 門檻數值或設定 → `src/config/config.js`
+- 細胞類別、表格列 → `src/constants/cell-types.js`（三個頁面會一起生效）
+- 狀態名稱、顏色 → `src/constants/status.js`
+
+---
+
+## 5. 一筆檢體的資料流
+
+### 檢體資料結構（IntakeMerge.toSpecimen）
+
+外部系統給的資料依來源分組，新介面自己產生的處理狀態放在 `review`，兩者不混在一起：
+
+```text
+{
+  barcode: 'H5080720647',                檢體條碼（四份資料的對應鍵）
+  imaging: {                             1. 影像與 AI 預分類結果
+    analysisTime,                        CellaVision 資料庫：DI-60 取像時間
+    cells: [{ cellId, imagePath, aiCategory, aiConfidence }],   每顆：CellaVision 影像＋AI 模型預分類
+    aiDiff: { band, segmentedNeutrophil, …, nrbc, … }           AI 分類結果（Diff%）＝畫面上的「AI 值」（皆為 %，分母＝白血球總數；非白血球另算）
+  },
+  wam: {                                 2. WAM
+    machine, location,                   玻片機台、檢體歸位
+    cbc: { wbc, plt, rbc, hb, hct, mcv, mch, mchc },            CBC data
+    flowDc: { … },                       Flow DC data
+    cbcFlags, flowDcFlags, pltFlag, sisRules                     CBC flag、Flow DC flag、PLT flag（判斷 3）、SIS rule
+  },
+  lis: {                                 3. LIS
+    patientId, name, gender, birthDate, age, department,        病患資料（age＝LIS 提供的年齡，留單門檻的年齡規則用）
+    receivedTime,                        收件時間（清單時效＝收件到現在經過的分鐘數，每 120 秒更新，暫定）
+    smearRequiredNote,                   「需推片確認」註記（判斷 2）
+    prevReport: { date, wbc, plt, diff: { … } }                 前次報告（LIS 最近一次）
+  },
+  review: {                              新介面的處理狀態（SpecimenStore 管理，正式系統存新介面後端）
+    status, workflowDone, statusDone,    膠囊、流程旗標、是否完成
+    editor, locked,                      編輯人員、鎖定中（他人編輯中）
+    editedDiff                           人員編輯值（影像檢視儲存後產生）
+  }
+}
+```
+
+程式中的 `specimenId`、`id` 參數與網址 `?specimen=` 都是檢體條碼（`spec.barcode`）。
+
+判斷用的數值一律透過 LeaveRules 取得，不直接拼欄位：`aiValues(spec)`（WBC、PLT＋aiDiff）、`prevValues(spec)`（前次報告）、`effectiveValues(spec)`（規則 4：有人員編輯值時用人員編輯值）、`getAgeYears(spec)`（年齡）。
+
+### 資料流
+
+```text
+sources/cellavision-db.js（影像）→ AiModelService.classifyAll（AI 模型預分類）；wam.js、lis.js（各以 barcode 為鍵）
+  │  IntakeMerge.mergeByBarcode（database.js 載入時呼叫；第 2 節）
+  │   - CellaVision 資料庫有影像，且 AI 結果、WAM、LIS 都有 → 合併成一筆檢體；缺任一份 → 暫不進線，記入 APP_DATABASE.intakeIssues
+  │   - 檢體依資料來源分組：imaging（影像＋AI 預分類）、wam、lis；新介面的處理狀態另放 review（結構見下方）
+  │   - 判斷 1 的 AI 值＝wam.cbc 的 WBC、PLT ＋ imaging.aiDiff（LeaveRules.aiValues）；判斷 2＝lis.smearRequiredNote；判斷 3＝wam.pltFlag
+  ▼
+database.js（APP_DATABASE.specimens；合併結果＋展示用狀態 DEMO_STATE）
+  │  SpecimenStore 初始化：
+  │   1. 讀回留單門檻（DemoStorage）
+  │   2. WorkflowRules.intakeStatus → 依進線資料加膠囊（規則 1 CBC 與 AI 值、規則 2 LIS 註記、規則 3 PLT**）
+  │   3. 整理流程旗標、計算是否完成
+  │   4. 套用已保存的狀態（DemoStorage）→ 再依目前門檻校正未簽核者
+  ▼
+檢體管理（specimen-list.js）
+  │  工作分流：WorkflowRules.inDigitalList／inEntityList／workQueue（規則 5）
+  │  篩選／排序：WorkflowRules.matchesStatusFilter、showsCheckmark
+  │  點實體標籤：SpecimenStore.toggleEntityStatus（規則 12）
+  │  進入閱片：AppNav.goToImageReview
+  ▼
+影像檢視（image-review.js）
+  │  細胞來源：已儲存的人員編輯結果 → 進線時合併好的 spec.imaging.cells（CellaVision 影像＋AI 模型 預分類）
+  │  儲存結果：計算人員編輯值（規則 8）→ SpecimenStore.saveEditedResult → 開啟報告核發 iframe
+  ▼
+報告核發（report-issue.js，iframe）
+  │  橫幅：LeaveRules.riskState（規則 4 自動選用人員編輯值或 AI 值）
+  │  按鈕 → postMessage 給外層影像檢視頁（見 6 節）
+  ▼
+影像檢視收到訊息 → SpecimenStore.signOffReport／switchToManualReview／markFollowUpDone
+  → 存入 DemoStorage → 返回檢體管理並顯示一次性提示
 ```
 
 ---
 
-## 四、上線前必做清單
+## 6. 頁面之間的溝通
 
-### 後端（需配合開發）
-- [ ] 實作 `POST /auth/login`（BCRYPT 加密驗證）
-- [ ] 實作 JWT 發行 + 驗證 Middleware
-- [ ] 實作 `GET/PATCH /specimens/*` API（含 RBAC 權限控制）
-- [ ] 實作 `GET/PUT /settings/thresholds`
-- [ ] 所有 API 啟用 HTTPS（TLS 1.2+）
-- [ ] 資料庫加密（病患 PHI 欄位）
-- [ ] 完整稽核日誌（誰、何時、看了/改了什麼）
+**報告核發（iframe）→ 影像檢視（外層）：`window.parent.postMessage`**
 
-### 前端（本專案）
-- [ ] 將 `AppConfig.ENV` 改為 `'production'`
-- [ ] 將 `AppConfig.API_BASE_URL` 改為真實後端 URL
-- [ ] 移除 `assets/data/database.js`（Mock 資料）
-- [ ] 移除登入頁的 Demo 模式提示
-- [ ] 移除 `api.service.js` 中的所有 `_mockRoutes`
-- [ ] 設定 Content Security Policy (CSP) Header
-- [ ] 替換 `cdn.tailwindcss.com` 為本地打包版本（避免 CDN 停服）
+| type | 時機 | 外層處理 |
+|------|------|----------|
+| `reportVerified` | 確認並簽核 | `SpecimenStore.signOffReport`；`navigateNextDigitalReview` 為 true 時開下一筆（規則 9） |
+| `reportManualAlert` | 改為人工鏡檢（已呼叫 LIS 模擬 API） | 更新狀態，返回清單並提示 |
+| `reportFollowUpDone` | 已拉片完成 | `SpecimenStore.markFollowUpDone`，返回清單 |
+| `reportCancel` | 關閉 | 關閉 iframe |
 
-### 流程
-- [ ] 滲透測試（Auth Bypass、XSS、CSRF）
-- [ ] HIPAA 合規審查
-- [ ] 與 LIS（Laboratory Information System）的 HL7/ASTM 介面測試
+外層 → 報告核發：`specimenDataUpdated`（簽核後請 iframe 重新整理）。
+報告核發單獨開啟（不在 iframe 內）時，自己完成上述動作並返回清單。
+
+**跨頁一次性提示**：動作完成後寫入 sessionStorage，檢體管理載入時讀出並刪除（`DemoStorage.queue*Toast`／`consume*Toast`）。
 
 ---
 
-## 五、各問題修正對照表
+## 7. 瀏覽器儲存一覽
 
-| # | 原版問題 | 修正檔案 | 修正說明 |
-|---|---|---|---|
-| 1 | 帳密硬寫前端 | `auth.service.js` | 驗證移至後端 API |
-| 2 | PHI 登入前暴露 | `index.html` | 登入頁不載入 database.js |
-| 3 | 狀態只存 localStorage | `api.service.js` + 後端 | PATCH API 持久化至資料庫 |
-| 4 | 無 API 抽象層 | `api.service.js` | 統一 HTTP 出入口 |
-| 5 | 業務邏輯三處分散 | `specimen.service.js` | 集中單一服務層 |
-| 6 | 全域命名空間汙染 | 所有 `src/` 檔案 | IIFE 模組化 |
-| 7 | 無閒置自動登出 | `auth.service.js` | 30 分鐘閒置計時器 |
-| 8 | 門檻設定只存本機 | `specimen.service.js` | 從後端 API 載入 |
-| 9 | 細胞常數重複定義 | `cell-types.js` | 單一來源常數檔 |
+所有 key 定義在 `AppConfig.STORAGE_KEYS`，讀寫一律經由 `DemoStorage`。
+
+| key | 儲存位置 | 內容 | 正式系統 |
+|-----|----------|------|----------|
+| `blood-morphology-font-level`、`-cell-image-zoom` | localStorage | 字級、細胞縮放 | 可保留 |
+| `blood-morphology-specimen-list-mode`、`-list-ui-state` | localStorage | 清單模式與篩選條件 | 可保留 |
+| `blood-morphology-leave-thresholds` | localStorage | 留單門檻 | **改存後端**（規則 7） |
+| `blood-morphology-specimen-status` | localStorage | 各檢體狀態與流程旗標 | **改存後端**（第 11 節） |
+| `blood-morphology-lis-writeback-log` | localStorage | 原型的 LIS 回寫紀錄（規則 14；`DemoStorage.readLisLog()` 可查看） | **刪除**（正式系統由後端寫入 LIS） |
+| `editedCells:<條碼>`、`editedDiff:<條碼>` | localStorage | 人員編輯的細胞分類與人員編輯值（review.editedDiff） | **改存後端** |
+| `blood-morphology-*-toast`、`-review-return-list-mode` | sessionStorage | 跨頁一次性訊息 | 可保留 |
+| `bhm_session_token`、`bhm_session_user`、`blood-morphology-user-account` | sessionStorage | 登入資訊 | 依後端驗證機制 |
+| `blood-morphology-usability-scenario` | localStorage | 展示用：目前情境 | 不需要 |
+
+登入時（模擬路由）會清除檢體狀態與人員編輯結果，讓 Demo 每次從原始資料開始；留單門檻保留。
+
+---
+
+## 8. 展示用功能（demo/）
+
+| 檔案 | 功能 | 與頁面的關係 |
+|------|------|--------------|
+| `tutorial.js`、`tutorial.css` | 使用教學 | 載入後依 `<body data-page="...">` 自動啟動，並綁定「使用教學」按鈕；頁面程式不呼叫它 |
+| `usability-study.js`、`usability-scenarios.js` | 情境模擬測試 | 檢體管理呼叫 `UsabilityStudy.attachToSpecimenList(...)`；`SpecimenStore.listForDisplay()` 在情境啟用時只列出該情境檢體 |
+
+**移除方式**：刪除 `demo/` 資料夾，並刪除各 HTML「4. 展示用」那一段 `<script>` 與 `demo/tutorial.css` 的 `<link>`；檢體管理頁上方的「使用教學」「情境模擬測試」按鈕與情境視窗也可一併刪除。頁面程式都有判斷 demo 是否存在，移除後照常運作（已實測）。
+
+---
+
+## 9. 測試
+
+```bash
+node tests/run-tests.js
+node tests/state-space.js     # 列出所有可能的膠囊狀態、分流與可做的操作
+```
+
+不需安裝任何套件。測試 `LeaveRules`、`WorkflowRules`、`CellConstants` 的規則，案例對應《邏輯規則說明文件》第 2～10 節。修改規則後請先跑一次。
+
+---
+
+## 10. 轉為正式系統要替換的地方
+
+**資料與 API**（`AppConfig.ENV = 'production'`、`API_BASE_URL` 改為實際網址）
+
+| 規劃路由 | 用途 | 原型目前的做法 |
+|----------|------|----------------|
+| `POST /auth/login`、`POST /auth/logout` | 登入／登出 | 模擬路由（admin/admin、user/user） |
+| `GET /specimens`、`GET /specimens/{barcode}` | 檢體清單與明細（第 11 節）；後端接收 AI 模型（讀取 CellaVision 資料庫影像後預分類）的結果，以 `IntakeMerge` 同樣規則與 WAM、LIS 合併 | `sources/*.js` → `IntakeMerge` → `database.js` |
+| `PATCH /specimens/{barcode}/workflow` | 狀態與流程旗標 | `SpecimenStore.persistStatus` → localStorage |
+| `PUT /specimens/{barcode}/edited-result` | 人員編輯的細胞分類與百分比 | `SpecimenStore.saveEditedResult` → localStorage |
+| `GET／PUT /settings/thresholds` | 留單門檻（規則 7） | `SpecimenStore.saveThresholds` → localStorage |
+| `POST /lis/withdrawal`（LIS → 新介面通知） | LIS 撤回（只限已簽核的數位閱片結果）：LIS 刪除 DC 數據；檢體回到進線狀態，檢體管理頁跳出撤回通知視窗（規則 15） | `SpecimenStore.withdrawFromLis`（原型未串接） |
+| `POST /lis/results` | 簽核後回寫 WBC Diff%、非白血球數據（規則 14） | 模擬路由（LisSync） |
+| `POST /lis/notes` | 回寫 LIS 檢驗註記：需拉片確認（規則 10）、拉片完成、血小板確認完成、數位閱片替代拉片鏡檢（規則 14） | 模擬路由（LisSync） |
+| AI 模型 → 新介面（路由待確認，附錄 A #5） | 林口人工智慧中心的 AI 模型讀取 CellaVision 資料庫影像，傳入每顆細胞影像、預分類與信心值、AI 分類結果（Diff%） | `AiModelService`（src/services/ai-model.service.js）依範例圖資料夾模擬預分類 |
+
+替換時只需改 `SpecimenStore`（呼叫 API 取代 `DemoStorage`）與 `assets/data/`；`src/rules/` 不需變動（`IntakeMerge` 可直接移植到後端，進線異常的處理待附錄 A #3 確認）。
+
+**上線前必做**
+- 帳密驗證只在後端；移除登入頁 Demo 提示與 `api.service.js` 的模擬路由
+- 登入頁不載入病患資料（目前已做到）；所有 API 需權限控制、HTTPS、稽核紀錄（誰、何時、看了／改了什麼）
+- 鎖定中（規則 6）由後端管理鎖定與釋放
+- Tailwind 改為本地打包（目前使用 CDN），並設定 Content Security Policy
+- 與 LIS 的介面測試（HL7／ASTM）
+
+---
+
+## 11. 維護慣例
+
+- **快取版本**：HTML 引用的 js／css 都帶 `?v=日期`（目前 `20261022o`）。修改任何 js／css 後，把各 HTML 的版本字串一起改掉（可全域取代），使用者的瀏覽器才會載入新檔。
+- **不要在 HTML 內寫程式**：頁面程式放 `assets/js/pages/`，共用放 `assets/js/core/`，規則放 `src/rules/`。HTML 內只保留 Tailwind 主題設定與 `AuthService.requireAuth()`。
+- **畫面不直接讀寫 localStorage**：一律經由 `DemoStorage`，正式系統替換時才不會漏。
