@@ -165,6 +165,9 @@ var DemoStorage = (function () {
     return parsed && parsed.specimenId ? parsed : null;
   }
 
+  /** 清掉還沒顯示的提示（登入、登出時：不帶到下一次登入） */
+  function clearToasts() { ssRemove(K.TOAST_MANUAL_REVIEW); ssRemove(K.TOAST_FOLLOW_UP_DONE); ssRemove(K.TOAST_REPORT_VERIFIED); }
+
   // ─── 展示用（demo/usability-study.js）──────────────────────
   function getUsabilityScenarioId() { return lsGet(K.USABILITY_SCENARIO) || ''; }
   function setUsabilityScenarioId(id) { if (id) lsSet(K.USABILITY_SCENARIO, id); else lsRemove(K.USABILITY_SCENARIO); }
@@ -189,6 +192,7 @@ var DemoStorage = (function () {
     queueManualReviewToast: queueManualReviewToast, consumeManualReviewToast: consumeManualReviewToast,
     queueFollowUpDoneToast: queueFollowUpDoneToast, consumeFollowUpDoneToast: consumeFollowUpDoneToast,
     queueReportVerifiedToast: queueReportVerifiedToast, consumeReportVerifiedToast: consumeReportVerifiedToast,
+    clearToasts: clearToasts,
     getUsabilityScenarioId: getUsabilityScenarioId, setUsabilityScenarioId: setUsabilityScenarioId
   };
 })();

@@ -103,6 +103,7 @@ const AuthService = (function () {
   function logout(opts = {}) {
     _stopIdleWatcher();
     _clearToken();
+    if (typeof DemoStorage !== 'undefined') DemoStorage.clearToasts();   // 未顯示的提示不帶到下一次登入
     // 通知後端 Token 失效（防止 Token 被偷後重用）
     ApiService.post('/auth/logout', {}).catch(() => {});
     const loginUrl = AppConfig.ROUTES.LOGIN;

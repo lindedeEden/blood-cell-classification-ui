@@ -285,6 +285,6 @@ node tests/state-space.js     # 列出所有可能的膠囊狀態、分流與可
 
 ## 11. 維護慣例
 
-- **快取版本**：HTML 引用的 js／css 都帶 `?v=日期`（目前 `20261023t`）。修改任何 js／css 後，把各 HTML 的版本字串一起改掉（可全域取代），使用者的瀏覽器才會載入新檔。
+- **快取版本**：HTML 引用的 js／css 都帶 `?v=日期`（目前 `20261025a`）。修改任何 js／css 後，把各 HTML 的版本字串一起改掉（可全域取代），使用者的瀏覽器才會載入新檔。
 - **不要在 HTML 內寫程式**：頁面程式放 `assets/js/pages/`，共用放 `assets/js/core/`，規則放 `src/rules/`。HTML 內只保留 Tailwind 主題設定與 `AuthService.requireAuth()`。
 - **畫面不直接讀寫 localStorage**：一律經由 `DemoStorage`，正式系統替換時才不會漏。

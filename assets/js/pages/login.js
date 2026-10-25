@@ -57,6 +57,7 @@
     // 呼叫 AuthService（後端驗證）
     const result = await AuthService.login(account.trim(), password);
     if (result.ok) {
+      if (typeof DemoStorage !== 'undefined') DemoStorage.clearToasts();   // 不顯示上一次登入留下的提示
       window.location.href = AppConfig.ROUTES.SPECIMEN_LIST;
     } else {
       showError(result.error || '登入失敗，請稍後再試');

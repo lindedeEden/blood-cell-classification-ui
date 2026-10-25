@@ -781,7 +781,6 @@
       forceUnlockSignOff: !!data.forceUnlockSignOff
     }) : null;
     if (!spec) return;
-    if (spec.review.statusDone) DemoStorage.queueReportVerifiedToast(id, WR.isCompleted(spec));
     notifyReportIframeToRefresh();
     if (currentSpecimen && currentSpecimen.barcode === id) {
       digitalReviewList = getDigitalReviewList();
@@ -795,6 +794,7 @@
         return;
       }
     }
+    if (spec.review.statusDone) DemoStorage.queueReportVerifiedToast(id, WR.isCompleted(spec));   // 只在回到清單時排入（直接開下一筆時不排，避免之後回到清單才跳出前一筆的提示）
     AppNav.goToSpecimenList({ preferMode: 'digital' });
   }
 
