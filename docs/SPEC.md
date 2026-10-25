@@ -2,7 +2,8 @@
 
 > 狀態：已確認並完成（2026-10-25，Eden）；與舊版的差異見 `CHANGES-FROM-LEGACY.md`
 > 依據：Agent Skills `spec-driven-development`、`deprecation-and-migration`（以新系統完整取代舊原型）
-> 舊版：`血球分類軟體介面設計專案`（GitHub `blood-cell-classification-ui`，commit d0b87e9）；**舊資料夾與舊 GitHub 儲存庫不動**
+> 舊版：`血球分類軟體介面設計專案`（GitHub `blood-cell-classification-ui`，commit d0b87e9）；搬遷期間**舊資料夾與舊 GitHub 儲存庫不動**
+> 2026-10-26（Eden 要求）：舊版同步 B12、A5 兩項修正後標為標籤 `legacy-v1`；GitHub master 改為本版本，展示頁（GitHub Pages）由 `gh-pages` 分支提供（內容＝`dist/`）
 
 ---
 
@@ -97,7 +98,7 @@ export function intakeRoute(spec: Specimen): 'Follow-up' | 'Digital Review' {
 
 - **一定做**：每完成一個模組就跑測試；規則改寫必須通過新舊對照；保留文件 2 的規則文字與 Eden 的修改
 - **先問 Eden**：任何會讓畫面或規則結果與舊版不同的改動（即使看起來是改善）；新增功能
-- **絕不做**：動到舊資料夾或舊 GitHub 儲存庫；把金鑰、病患真實資料放進程式
+- **絕不做**：未經 Eden 要求動到舊資料夾或舊 GitHub 儲存庫；把金鑰、病患真實資料放進程式
 
 ## 10. 完成標準
 
@@ -125,3 +126,4 @@ export function intakeRoute(spec: Specimen): 'Follow-up' | 'Digital Review' {
 1. 第 2 節的 6 個假設正確。
 2. 舊版明顯的小錯誤（例如錯字）：新版**修正**，並列入 `docs/CHANGES-FROM-LEGACY.md` 給 Eden 確認。
 3. 2026-10-25 另確認三項調整：人員編輯值一律採用、報告簽核頁不能直接用網址開啟、返回清單選取剛處理的檢體（`CHANGES-FROM-LEGACY.md` A1～A3）。
+4. 之後再確認兩項：報告簽核頁 CBC 加前次值（A4）、清單排序只有全部完成的才排最下面並預設依時效（A5）。
