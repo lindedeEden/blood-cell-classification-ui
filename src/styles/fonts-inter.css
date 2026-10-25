@@ -1,0 +1,5 @@
+/* Inter（拉丁字母與數字）：本地字型檔，院內網路不能連外也能顯示（取代舊版的 Google Fonts） */
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap; src: url('../../node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 500; font-display: swap; src: url('../../node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 600; font-display: swap; src: url('../../node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap; src: url('../../node_modules/@fontsource/inter/files/inter-latin-700-normal.woff2') format('woff2'); }

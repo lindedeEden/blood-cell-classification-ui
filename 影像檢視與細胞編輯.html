@@ -3,91 +3,15 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>影像檢視與細胞編輯 - 血球型態分類軟體</title>
-<script src="assets/js/core/ui-preload.js?v=20261026a"></script>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#197fe6",
-                        "background-light": "#f8f9fa",
-                        "background-dark": "#111921",
-                        "card": "#ffffff",
-                        "card-dark": "#1a242d"
-                    },
-                    fontFamily: {
-                        "display": ["Inter", "sans-serif"]
-                    },
-                    borderRadius: {
-                        "DEFAULT": "0.375rem",
-                        "lg": "0.5rem",
-                        "xl": "0.75rem",
-                        "full": "9999px"
-                    },
-                    boxShadow: {
-                        'subtle': '0 2px 4px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.04)',
-                        'subtle-dark': '0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.2)',
-                        'context': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0,0,0,0.05)'
-                    },
-                    keyframes: {
-                        'scale-in': {
-                            '0%': { transform: 'scale(0.95)', opacity: '0' },
-                            '100%': { transform: 'scale(1)', opacity: '1' },
-                        }
-                    },
-                    animation: {
-                        'scale-in': 'scale-in 0.1s ease-out forwards',
-                    }
-                },
-            },
-        }
-    </script>
-<style type="text/tailwindcss">
-        .material-symbols-outlined {
-            font-variation-settings:
-                'FILL' 0,
-                'wght' 400,
-                'GRAD' 0,
-                'opsz' 24
-        }
-        .dropdown-container:focus-within .dropdown-menu {
-            display: block;
-        }
-        .back-link-group:hover .back-icon {
-            transform: translateX(-4px);
-        }
-        #context-menu {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            transform-origin: top left;
-            max-height: calc(100vh - 16px);
-            overflow-y: auto;
-        }
-        .menu-item {
-            @apply flex items-center justify-center h-9 text-[11px] font-semibold rounded border border-gray-300 bg-white text-gray-700 hover:bg-primary/5 hover:border-primary hover:text-primary transition-all active:scale-[0.98] shadow-sm leading-tight;
-        }
-        .menu-item-danger {
-            @apply flex items-center justify-center h-9 text-[11px] font-semibold rounded border border-red-200 bg-white text-red-600 hover:bg-red-50 transition-all active:scale-[0.98] shadow-sm leading-tight;
-        }
-        .grid-collapsed {
-            max-height: 120px;
-            overflow: hidden;
-        }
-        .grid-expanded {
-            max-height: none;
-        }
-        .icon-rotate-180 {
-            transform: rotate(180deg);
-        }
-    </style>
-<link rel="stylesheet" href="assets/css/common.css?v=20261026a"/>
-<link rel="stylesheet" href="demo/tutorial.css?v=20261026a"/>
+
+<!-- preload-preferences：建置時填入字級與縮放的預先套用程式（src/ui/shared/preference-rules.ts） -->
+  <link rel="stylesheet" href="/src/styles/pages/image-review.css"/>
+  <script type="module" src="/src/pages/image-review.ts"></script>
 </head>
 <body class="bg-background-light font-display text-gray-800 text-sm min-h-0" data-page="image-review">
+<!-- source-file-notice：只在直接雙擊原始檔時看得到；開發與建置時由 vite.config.ts 移除 -->
+<div id="source-file-notice" style="position:fixed;inset:0;z-index:99999;background:#fff;padding:40px;font:18px/1.7 sans-serif;color:#1f3a5f"><h1 style="font-size:24px;margin:0 0 12px">這是程式原始檔，不能直接開啟</h1><p>請改開建置好的版本：<a href="dist/index.html" style="color:#1565c0">程式／dist／index.html</a>（雙擊即可使用）。</p><p style="color:#5f6b73;font-size:15px">開發時請在「程式」資料夾執行 npm run dev（見 README.md）。</p></div>
+<!-- /source-file-notice -->
 <div class="flex h-screen w-full min-h-0 overflow-hidden">
 <aside class="w-1/3 min-w-[300px] max-w-[420px] flex-shrink-0 bg-card border-r border-gray-300/80 flex flex-col p-4 space-y-4 min-h-0 overflow-y-auto overscroll-contain">
 <div class="space-y-4">
@@ -265,37 +189,5 @@
 </details>
 </div>
 </div>
-
-  <!-- ▌ 1. 設定、常數與規則（src/，不含畫面程式；正式系統可沿用） -->
-  <script src="src/config/config.js?v=20261026a"></script>
-  <script src="src/constants/cell-types.js?v=20261026a"></script>
-  <script src="src/constants/status.js?v=20261026a"></script>
-  <script src="src/rules/leave-rules.js?v=20261026a"></script>
-  <script src="src/rules/workflow-rules.js?v=20261026a"></script>
-  <script src="src/rules/intake-merge.js?v=20261026a"></script>
-  <script src="src/services/api.service.js?v=20261026a"></script>
-  <script src="src/services/auth.service.js?v=20261026a"></script>
-  <script src="src/services/ai-model.service.js?v=20261026a"></script>
-  <!-- ▌ 2. 登入檢查：未登入直接導回登入頁 -->
-  <script>AuthService.requireAuth();</script>
-  <!-- ▌ 3. 模擬資料（正式系統改由後端 API 取得） -->
-  <!-- 進線：CellaVision 資料庫影像 → AI 模型預分類（AiModelService 模擬）、WAM、LIS 依條碼合併（IntakeMerge）→ database.js -->
-  <script src="assets/data/sources/cellavision-db.js?v=20261026a"></script>
-  <script src="assets/data/sources/ai-model-mock.js?v=20261026a"></script>
-  <script src="assets/data/sources/wam.js?v=20261026a"></script>
-  <script src="assets/data/sources/lis.js?v=20261026a"></script>
-  <script src="assets/data/database.js?v=20261026a"></script>
-  <!-- ▌ 4. 展示用（demo/：教學導覽、情境模擬測試）；可整段移除，不影響正式功能 -->
-  <script src="demo/usability-scenarios.js?v=20261026a"></script>
-  <script src="demo/usability-study.js?v=20261026a"></script>
-  <script src="demo/tutorial.js?v=20261026a"></script>
-  <!-- ▌ 5. 共用核心（瀏覽器儲存、檢體資料與動作、頁面跳轉、共用畫面工具） -->
-  <script src="assets/js/core/storage.js?v=20261026a"></script>
-  <script src="assets/js/core/lis-sync.js?v=20261026a"></script>
-  <script src="assets/js/core/specimen-store.js?v=20261026a"></script>
-  <script src="assets/js/core/navigation.js?v=20261026a"></script>
-  <script src="assets/js/core/ui-common.js?v=20261026a"></script>
-  <!-- ▌ 6. 本頁程式 -->
-  <script src="assets/js/pages/image-review.js?v=20261026a"></script>
 
 </body></html>

@@ -4,43 +4,14 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>血球型態分類軟體 — 登入</title>
-  <!-- 程式結構說明見 ARCHITECTURE.md -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet"/>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: { primary: "#4F46E5" },
-          fontFamily: { sans: ["Inter", "sans-serif"] },
-        },
-      },
-    };
-  </script>
-  <style>
-    .login-card { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); }
-    .input-focus:focus { outline: none; border-color: #4F46E5; box-shadow: 0 0 0 3px rgba(79,70,229,0.2); }
-    .material-symbols-outlined {
-      font-family: 'Material Symbols Outlined';
-      font-weight: normal;
-      font-style: normal;
-      font-size: 24px;
-      line-height: 1;
-      letter-spacing: normal;
-      text-transform: none;
-      display: inline-block;
-      white-space: nowrap;
-      word-wrap: normal;
-      direction: ltr;
-      -webkit-font-feature-settings: 'liga';
-      font-feature-settings: 'liga';
-      -webkit-font-smoothing: antialiased;
-      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-    }
-  </style>
+
+  <link rel="stylesheet" href="/src/styles/pages/login.css"/>
+  <script type="module" src="/src/pages/login.ts"></script>
 </head>
 <body class="bg-slate-100 min-h-screen font-sans flex items-center justify-center px-4">
+<!-- source-file-notice：只在直接雙擊原始檔時看得到；開發與建置時由 vite.config.ts 移除 -->
+<div id="source-file-notice" style="position:fixed;inset:0;z-index:99999;background:#fff;padding:40px;font:18px/1.7 sans-serif;color:#1f3a5f"><h1 style="font-size:24px;margin:0 0 12px">這是程式原始檔，不能直接開啟</h1><p>請改開建置好的版本：<a href="dist/index.html" style="color:#1565c0">程式／dist／index.html</a>（雙擊即可使用）。</p><p style="color:#5f6b73;font-size:15px">開發時請在「程式」資料夾執行 npm run dev（見 README.md）。</p></div>
+<!-- /source-file-notice -->
   <div class="w-full max-w-md">
     <div class="login-card bg-white rounded-2xl border border-slate-200 p-8 sm:p-10">
       <div class="text-center mb-8">
@@ -107,12 +78,5 @@
       </div>
     </div>
   </div>
-
-  <!-- ▌ 登入頁不載入任何病患資料（database.js）；病患資料只在登入後的頁面取得 -->
-  <script src="src/config/config.js?v=20261026a"></script>
-  <script src="assets/js/core/storage.js?v=20261026a"></script>
-  <script src="src/services/api.service.js?v=20261026a"></script>
-  <script src="src/services/auth.service.js?v=20261026a"></script>
-  <script src="assets/js/pages/login.js?v=20261026a"></script>
 </body>
 </html>

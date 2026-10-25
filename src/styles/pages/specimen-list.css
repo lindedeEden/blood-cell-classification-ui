@@ -1,0 +1,9 @@
+@import '../fonts-icons.css';
+@import '../fonts-inter.css';
+@import '../common.css';
+@import '../../demo/tutorial.css';
+@config "../../../tailwind/list.config.js";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

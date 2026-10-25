@@ -1,49 +1,17 @@
+<!DOCTYPE html>
 <html class="light font-size-normal" lang="zh-TW"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>數據核發確認介面</title>
-<script src="assets/js/core/ui-preload.js?v=20261026a"></script>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">
-        tailwind.config = {
-            /* 預設為 media：Chrome 在系統深色時會套用所有 dark:，與 Edge 顯示不一致；改為 class 且根節點不加 dark → 固定淺色 */
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#1f5c7a",
-                        "medical-blue": "#2563eb",
-                        "background-light": "#f6f7f8",
-                        "background-dark": "#131b1f",
-                        "medical-red": "hsl(0, 70%, 45%)",
-                        "medical-red-soft": "hsla(0, 70%, 45%, 0.1)",
-                    },
-                    fontFamily: {
-                        "display": ["Noto Sans TC", "Manrope", "sans-serif"]
-                    },
-                    borderRadius: { "DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px" },
-                },
-            },
-        }
-    </script>
-<style type="text/tailwindcss">
-        @layer base {
-            html { color-scheme: light; }
-            ::-webkit-scrollbar { width: 4px; }
-            ::-webkit-scrollbar-track { background: transparent; }
-            ::-webkit-scrollbar-thumb { background: #d3dee4; border-radius: 10px; }
-        }
-        .modal-backdrop {
-            background: rgba(19, 27, 31, 0.4);
-            backdrop-filter: blur(8px);
-        }
-        .tabular { font-variant-numeric: tabular-nums; }
-</style>
-<link rel="stylesheet" href="assets/css/common.css?v=20261026a"/>
-<link rel="stylesheet" href="demo/tutorial.css?v=20261026a"/>
+
+<!-- preload-preferences：建置時填入字級與縮放的預先套用程式（src/ui/shared/preference-rules.ts） -->
+  <link rel="stylesheet" href="/src/styles/pages/report.css"/>
+  <script type="module" src="/src/pages/report.ts"></script>
 </head>
 <body class="bg-background-light font-display h-screen min-h-0 flex items-center justify-center overflow-hidden p-2" data-page="report-issue">
+<!-- source-file-notice：只在直接雙擊原始檔時看得到；開發與建置時由 vite.config.ts 移除 -->
+<div id="source-file-notice" style="position:fixed;inset:0;z-index:99999;background:#fff;padding:40px;font:18px/1.7 sans-serif;color:#1f3a5f"><h1 style="font-size:24px;margin:0 0 12px">這是程式原始檔，不能直接開啟</h1><p>請改開建置好的版本：<a href="dist/index.html" style="color:#1565c0">程式／dist／index.html</a>（雙擊即可使用）。</p><p style="color:#5f6b73;font-size:15px">開發時請在「程式」資料夾執行 npm run dev（見 README.md）。</p></div>
+<!-- /source-file-notice -->
 <div class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-2 min-h-0 overflow-y-auto">
 <div class="bg-white w-full max-w-[1150px] h-auto max-h-[min(98vh,100%)] min-h-0 overflow-hidden rounded-xl shadow-2xl flex flex-col border border-zinc-300 my-auto">
 <div id="tutorial-report-tl">
@@ -160,34 +128,42 @@
 <div class="flex flex-col">
 <span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">WBC</span>
 <span id="cbc-wbc" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
+<span id="cbc-prev-wbc" class="text-zinc-500 dark:text-zinc-400 text-[10px] tabular"></span>
 </div>
 <div class="flex flex-col">
 <span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">RBC</span>
 <span id="cbc-rbc" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
+<span id="cbc-prev-rbc" class="text-zinc-500 dark:text-zinc-400 text-[10px] tabular"></span>
 </div>
 <div class="flex flex-col">
 <span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">Hb</span>
 <span id="cbc-hb" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
+<span id="cbc-prev-hb" class="text-zinc-500 dark:text-zinc-400 text-[10px] tabular"></span>
 </div>
 <div class="flex flex-col">
 <span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">HCT</span>
 <span id="cbc-hct" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
+<span id="cbc-prev-hct" class="text-zinc-500 dark:text-zinc-400 text-[10px] tabular"></span>
 </div>
 <div class="flex flex-col">
 <span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">MCV</span>
 <span id="cbc-mcv" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
+<span id="cbc-prev-mcv" class="text-zinc-500 dark:text-zinc-400 text-[10px] tabular"></span>
 </div>
 <div class="flex flex-col">
 <span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">MCH</span>
 <span id="cbc-mch" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
+<span id="cbc-prev-mch" class="text-zinc-500 dark:text-zinc-400 text-[10px] tabular"></span>
 </div>
 <div class="flex flex-col">
 <span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">MCHC</span>
 <span id="cbc-mchc" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
+<span id="cbc-prev-mchc" class="text-zinc-500 dark:text-zinc-400 text-[10px] tabular"></span>
 </div>
 <div class="flex flex-col">
 <span class="text-zinc-600 text-[9px] font-bold uppercase tracking-tight">PLT</span>
 <span id="cbc-plt" class="text-zinc-900 dark:text-zinc-100 text-sm font-bold tabular"></span>
+<span id="cbc-prev-plt" class="text-zinc-500 dark:text-zinc-400 text-[10px] tabular"></span>
 </div>
 </div>
 </div>
@@ -200,7 +176,7 @@
 <span class="material-symbols-outlined text-zinc-400 text-[20px]">account_circle</span>
 <div class="flex items-center gap-1.5">
 <span class="text-zinc-600 text-xs">當前操作者：</span>
-<span class="text-zinc-700 dark:text-zinc-300 text-xs font-bold">王小明 <span class="font-normal text-zinc-600">(M12345)</span></span>
+<span id="report-operator" class="text-zinc-700 dark:text-zinc-300 text-xs font-bold">王小明 <span id="report-operator-id" class="font-normal text-zinc-600">(M12345)</span></span>
 </div>
 </div>
 <div class="flex items-center gap-3">
@@ -228,36 +204,4 @@
 <div class="col-span-6 row-span-4 bg-zinc-500 rounded-lg"></div>
 <div class="col-span-3 row-span-3 bg-zinc-500 rounded-lg"></div>
 </div>
-
-  <!-- ▌ 1. 設定、常數與規則（src/，不含畫面程式；正式系統可沿用） -->
-  <script src="src/config/config.js?v=20261026a"></script>
-  <script src="src/constants/cell-types.js?v=20261026a"></script>
-  <script src="src/constants/status.js?v=20261026a"></script>
-  <script src="src/rules/leave-rules.js?v=20261026a"></script>
-  <script src="src/rules/workflow-rules.js?v=20261026a"></script>
-  <script src="src/rules/intake-merge.js?v=20261026a"></script>
-  <script src="src/services/api.service.js?v=20261026a"></script>
-  <script src="src/services/auth.service.js?v=20261026a"></script>
-  <script src="src/services/ai-model.service.js?v=20261026a"></script>
-  <!-- ▌ 2. 登入檢查：未登入直接導回登入頁 -->
-  <script>AuthService.requireAuth();</script>
-  <!-- ▌ 3. 模擬資料（正式系統改由後端 API 取得） -->
-  <!-- 進線：CellaVision 資料庫影像 → AI 模型預分類（AiModelService 模擬）、WAM、LIS 依條碼合併（IntakeMerge）→ database.js -->
-  <script src="assets/data/sources/cellavision-db.js?v=20261026a"></script>
-  <script src="assets/data/sources/ai-model-mock.js?v=20261026a"></script>
-  <script src="assets/data/sources/wam.js?v=20261026a"></script>
-  <script src="assets/data/sources/lis.js?v=20261026a"></script>
-  <script src="assets/data/database.js?v=20261026a"></script>
-  <!-- ▌ 4. 展示用（demo/：教學導覽、情境模擬測試）；可整段移除，不影響正式功能 -->
-  <script src="demo/usability-scenarios.js?v=20261026a"></script>
-  <script src="demo/usability-study.js?v=20261026a"></script>
-  <script src="demo/tutorial.js?v=20261026a"></script>
-  <!-- ▌ 5. 共用核心（瀏覽器儲存、檢體資料與動作、頁面跳轉、共用畫面工具） -->
-  <script src="assets/js/core/storage.js?v=20261026a"></script>
-  <script src="assets/js/core/lis-sync.js?v=20261026a"></script>
-  <script src="assets/js/core/specimen-store.js?v=20261026a"></script>
-  <script src="assets/js/core/navigation.js?v=20261026a"></script>
-  <script src="assets/js/core/ui-common.js?v=20261026a"></script>
-  <!-- ▌ 6. 本頁程式 -->
-  <script src="assets/js/pages/report-issue.js?v=20261026a"></script>
 </body></html>

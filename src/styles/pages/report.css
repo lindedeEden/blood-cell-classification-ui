@@ -1,0 +1,20 @@
+@import '../fonts-icons.css';
+@import '../common.css';
+@import '../../demo/tutorial.css';
+@config "../../../tailwind/report.config.js";
+
+@tailwind base;
+@layer base {
+  html { color-scheme: light; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d3dee4; border-radius: 10px; }
+}
+@tailwind components;
+@tailwind utilities;
+
+.modal-backdrop {
+  background: rgba(19, 27, 31, 0.4);
+  backdrop-filter: blur(8px);
+}
+.tabular { font-variant-numeric: tabular-nums; }

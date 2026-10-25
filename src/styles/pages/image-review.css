@@ -1,0 +1,32 @@
+@import '../fonts-inter.css';
+@import '../fonts-icons.css';
+@import '../common.css';
+@import '../../demo/tutorial.css';
+@config "../../../tailwind/image.config.js";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+.dropdown-container:focus-within .dropdown-menu { display: block; }
+.back-link-group:hover .back-icon { transform: translateX(-4px); }
+#context-menu {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  transform-origin: top left;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+.menu-item {
+  @apply flex items-center justify-center h-9 text-[11px] font-semibold rounded border border-gray-300 bg-white text-gray-700 hover:bg-primary/5 hover:border-primary hover:text-primary transition-all active:scale-[0.98] shadow-sm leading-tight;
+}
+.menu-item-danger {
+  @apply flex items-center justify-center h-9 text-[11px] font-semibold rounded border border-red-200 bg-white text-red-600 hover:bg-red-50 transition-all active:scale-[0.98] shadow-sm leading-tight;
+}
+.grid-collapsed { max-height: 120px; overflow: hidden; }
+.grid-expanded { max-height: none; }
+.icon-rotate-180 { transform: rotate(180deg); }

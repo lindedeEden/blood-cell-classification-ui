@@ -1,0 +1,26 @@
+/*
+ * Material Symbols Outlined：只保留介面用到的圖示（tools/build-icon-font.py 產生）
+ * 新增圖示時記得重新產生字型，否則會顯示成英文字。
+ */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('./fonts/material-symbols-subset.woff2') format('woff2');
+}
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}

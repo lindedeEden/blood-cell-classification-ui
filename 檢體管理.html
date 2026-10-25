@@ -4,37 +4,15 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>檢體管理 - 血球型態分類軟體</title>
-  <script src="assets/js/core/ui-preload.js?v=20261026a"></script>
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: "#4F46E5",
-            "background-light": "#F8FAFC",
-            "surface-light": "#FFFFFF",
-            "text-light": "#334155",
-            "text-muted-light": "#475569",
-            "border-light": "#CBD5E1",
-            "danger-light": "#FEE2E2",
-            "danger-text-light": "#B91C1C",
-            "success-light": "#D1FAE5",
-            "success-text-light": "#059669",
-            "info-light": "#DBEAFE",
-            "info-text-light": "#2563EB",
-          },
-          fontFamily: { sans: ["Inter", "sans-serif"] },
-        },
-      },
-    };
-  </script>
-  <link rel="stylesheet" href="assets/css/common.css?v=20261026a"/>
-  <link rel="stylesheet" href="demo/tutorial.css?v=20261026a"/>
+
+<!-- preload-preferences：建置時填入字級與縮放的預先套用程式（src/ui/shared/preference-rules.ts） -->
+  <link rel="stylesheet" href="/src/styles/pages/specimen-list.css"/>
+  <script type="module" src="/src/pages/specimen-list.ts"></script>
 </head>
 <body class="bg-background-light text-text-light text-sm min-h-0" data-page="specimen-list">
+<!-- source-file-notice：只在直接雙擊原始檔時看得到；開發與建置時由 vite.config.ts 移除 -->
+<div id="source-file-notice" style="position:fixed;inset:0;z-index:99999;background:#fff;padding:40px;font:18px/1.7 sans-serif;color:#1f3a5f"><h1 style="font-size:24px;margin:0 0 12px">這是程式原始檔，不能直接開啟</h1><p>請改開建置好的版本：<a href="dist/index.html" style="color:#1565c0">程式／dist／index.html</a>（雙擊即可使用）。</p><p style="color:#5f6b73;font-size:15px">開發時請在「程式」資料夾執行 npm run dev（見 README.md）。</p></div>
+<!-- /source-file-notice -->
   <div class="flex flex-col h-screen min-h-0 overflow-hidden">
     <header class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-2 border-b bg-surface-light border-border-light shrink-0">
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2 min-w-0">
@@ -52,7 +30,7 @@
         <button type="button" class="p-2 rounded hover:bg-gray-100" title="縮小字型" id="font-smaller"><span class="material-symbols-outlined text-base">remove</span></button>
         <button type="button" class="p-2 rounded hover:bg-gray-100" title="放大字型" id="font-larger"><span class="material-symbols-outlined text-base">add</span></button>
         <button type="button" class="p-2 rounded hover:bg-gray-100" title="系統設定" id="btn-settings"><span class="material-symbols-outlined">settings</span></button>
-        <button type="button" class="p-2 rounded hover:bg-gray-100" title="登出"><span class="material-symbols-outlined">power_settings_new</span></button>
+        <button type="button" class="p-2 rounded hover:bg-gray-100" title="登出" id="btn-logout"><span class="material-symbols-outlined">power_settings_new</span></button>
       </div>
     </header>
 
@@ -245,39 +223,5 @@
       <span id="specimen-list-toast-text"></span>
     </div>
   </div>
-
-
-  
-  <!-- ▌ 1. 設定、常數與規則（src/，不含畫面程式；正式系統可沿用） -->
-  <script src="src/config/config.js?v=20261026a"></script>
-  <script src="src/constants/cell-types.js?v=20261026a"></script>
-  <script src="src/constants/status.js?v=20261026a"></script>
-  <script src="src/rules/leave-rules.js?v=20261026a"></script>
-  <script src="src/rules/workflow-rules.js?v=20261026a"></script>
-  <script src="src/rules/intake-merge.js?v=20261026a"></script>
-  <script src="src/services/api.service.js?v=20261026a"></script>
-  <script src="src/services/auth.service.js?v=20261026a"></script>
-  <script src="src/services/ai-model.service.js?v=20261026a"></script>
-  <!-- ▌ 2. 登入檢查：未登入直接導回登入頁 -->
-  <script>AuthService.requireAuth();</script>
-  <!-- ▌ 3. 模擬資料（正式系統改由後端 API 取得） -->
-  <!-- 進線：CellaVision 資料庫影像 → AI 模型預分類（AiModelService 模擬）、WAM、LIS 依條碼合併（IntakeMerge）→ database.js -->
-  <script src="assets/data/sources/cellavision-db.js?v=20261026a"></script>
-  <script src="assets/data/sources/ai-model-mock.js?v=20261026a"></script>
-  <script src="assets/data/sources/wam.js?v=20261026a"></script>
-  <script src="assets/data/sources/lis.js?v=20261026a"></script>
-  <script src="assets/data/database.js?v=20261026a"></script>
-  <!-- ▌ 4. 展示用（demo/：教學導覽、情境模擬測試）；可整段移除，不影響正式功能 -->
-  <script src="demo/usability-scenarios.js?v=20261026a"></script>
-  <script src="demo/usability-study.js?v=20261026a"></script>
-  <script src="demo/tutorial.js?v=20261026a"></script>
-  <!-- ▌ 5. 共用核心（瀏覽器儲存、檢體資料與動作、頁面跳轉、共用畫面工具） -->
-  <script src="assets/js/core/storage.js?v=20261026a"></script>
-  <script src="assets/js/core/lis-sync.js?v=20261026a"></script>
-  <script src="assets/js/core/specimen-store.js?v=20261026a"></script>
-  <script src="assets/js/core/navigation.js?v=20261026a"></script>
-  <script src="assets/js/core/ui-common.js?v=20261026a"></script>
-  <!-- ▌ 6. 本頁程式 -->
-  <script src="assets/js/pages/specimen-list.js?v=20261026a"></script>
 </body>
 </html>

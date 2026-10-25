@@ -1,11 +1,7 @@
-# 只上傳程式運作相關檔案；文件與工具不上傳
-Claude outputs/
-tools/
-*.xlsx
-*.docx
-*.pdf
-*.tgz
-~$*
-.cursor/
-血球範例圖片/
-附件一*
+node_modules/
+test-results/
+playwright-report/
+tests/e2e/__output__/
+*.log
+.DS_Store
+strix_runs/

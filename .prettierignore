@@ -1,0 +1,6 @@
+dist
+node_modules
+tests/parity/golden
+src/data/sources
+*.html
+*.css
