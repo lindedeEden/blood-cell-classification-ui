@@ -202,7 +202,7 @@ var WorkflowRules = (function () {
     return true;
   }
 
-  /** 第 4 節：狀態欄出現綠勾者（或已完成）排到清單最下方 */
+  /** 狀態欄是否出現綠勾（或已完成）。清單排序已不使用：2026-10-26 起只有全部完成的才排最下方（見 specimen-list compareSpecimens） */
   function showsCheckmark(spec) {
     if (!spec) return false;
     if (hasStatus(spec, 'Digital Review') && isDigitalReviewDone(spec)) return true;

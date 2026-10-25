@@ -100,7 +100,7 @@ const AppConfig = Object.freeze({
     FONT_LEVEL: 'blood-morphology-font-level',
     CELL_ZOOM: 'blood-morphology-cell-image-zoom',
     LIST_MODE: 'blood-morphology-specimen-list-mode',
-    LIST_UI_STATE: 'blood-morphology-specimen-list-ui-state',
+    LIST_UI_STATE: 'blood-morphology-specimen-list-ui-state-v2',   // v2：預設排序改為時效（2026-10-26），舊的清單狀態不再沿用
     // ── Demo：業務資料（localStorage；正式系統改存後端）
     LEAVE_THRESHOLDS: 'blood-morphology-leave-thresholds',
     SPECIMEN_STATUS: 'blood-morphology-specimen-status',

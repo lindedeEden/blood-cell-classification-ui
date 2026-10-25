@@ -3,7 +3,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>影像檢視與細胞編輯 - 血球型態分類軟體</title>
-<script src="assets/js/core/ui-preload.js?v=20261025a"></script>
+<script src="assets/js/core/ui-preload.js?v=20261026a"></script>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -84,8 +84,8 @@
             transform: rotate(180deg);
         }
     </style>
-<link rel="stylesheet" href="assets/css/common.css?v=20261025a"/>
-<link rel="stylesheet" href="demo/tutorial.css?v=20261025a"/>
+<link rel="stylesheet" href="assets/css/common.css?v=20261026a"/>
+<link rel="stylesheet" href="demo/tutorial.css?v=20261026a"/>
 </head>
 <body class="bg-background-light font-display text-gray-800 text-sm min-h-0" data-page="image-review">
 <div class="flex h-screen w-full min-h-0 overflow-hidden">
@@ -267,35 +267,35 @@
 </div>
 
   <!-- ▌ 1. 設定、常數與規則（src/，不含畫面程式；正式系統可沿用） -->
-  <script src="src/config/config.js?v=20261025a"></script>
-  <script src="src/constants/cell-types.js?v=20261025a"></script>
-  <script src="src/constants/status.js?v=20261025a"></script>
-  <script src="src/rules/leave-rules.js?v=20261025a"></script>
-  <script src="src/rules/workflow-rules.js?v=20261025a"></script>
-  <script src="src/rules/intake-merge.js?v=20261025a"></script>
-  <script src="src/services/api.service.js?v=20261025a"></script>
-  <script src="src/services/auth.service.js?v=20261025a"></script>
-  <script src="src/services/ai-model.service.js?v=20261025a"></script>
+  <script src="src/config/config.js?v=20261026a"></script>
+  <script src="src/constants/cell-types.js?v=20261026a"></script>
+  <script src="src/constants/status.js?v=20261026a"></script>
+  <script src="src/rules/leave-rules.js?v=20261026a"></script>
+  <script src="src/rules/workflow-rules.js?v=20261026a"></script>
+  <script src="src/rules/intake-merge.js?v=20261026a"></script>
+  <script src="src/services/api.service.js?v=20261026a"></script>
+  <script src="src/services/auth.service.js?v=20261026a"></script>
+  <script src="src/services/ai-model.service.js?v=20261026a"></script>
   <!-- ▌ 2. 登入檢查：未登入直接導回登入頁 -->
   <script>AuthService.requireAuth();</script>
   <!-- ▌ 3. 模擬資料（正式系統改由後端 API 取得） -->
   <!-- 進線：CellaVision 資料庫影像 → AI 模型預分類（AiModelService 模擬）、WAM、LIS 依條碼合併（IntakeMerge）→ database.js -->
-  <script src="assets/data/sources/cellavision-db.js?v=20261025a"></script>
-  <script src="assets/data/sources/ai-model-mock.js?v=20261025a"></script>
-  <script src="assets/data/sources/wam.js?v=20261025a"></script>
-  <script src="assets/data/sources/lis.js?v=20261025a"></script>
-  <script src="assets/data/database.js?v=20261025a"></script>
+  <script src="assets/data/sources/cellavision-db.js?v=20261026a"></script>
+  <script src="assets/data/sources/ai-model-mock.js?v=20261026a"></script>
+  <script src="assets/data/sources/wam.js?v=20261026a"></script>
+  <script src="assets/data/sources/lis.js?v=20261026a"></script>
+  <script src="assets/data/database.js?v=20261026a"></script>
   <!-- ▌ 4. 展示用（demo/：教學導覽、情境模擬測試）；可整段移除，不影響正式功能 -->
-  <script src="demo/usability-scenarios.js?v=20261025a"></script>
-  <script src="demo/usability-study.js?v=20261025a"></script>
-  <script src="demo/tutorial.js?v=20261025a"></script>
+  <script src="demo/usability-scenarios.js?v=20261026a"></script>
+  <script src="demo/usability-study.js?v=20261026a"></script>
+  <script src="demo/tutorial.js?v=20261026a"></script>
   <!-- ▌ 5. 共用核心（瀏覽器儲存、檢體資料與動作、頁面跳轉、共用畫面工具） -->
-  <script src="assets/js/core/storage.js?v=20261025a"></script>
-  <script src="assets/js/core/lis-sync.js?v=20261025a"></script>
-  <script src="assets/js/core/specimen-store.js?v=20261025a"></script>
-  <script src="assets/js/core/navigation.js?v=20261025a"></script>
-  <script src="assets/js/core/ui-common.js?v=20261025a"></script>
+  <script src="assets/js/core/storage.js?v=20261026a"></script>
+  <script src="assets/js/core/lis-sync.js?v=20261026a"></script>
+  <script src="assets/js/core/specimen-store.js?v=20261026a"></script>
+  <script src="assets/js/core/navigation.js?v=20261026a"></script>
+  <script src="assets/js/core/ui-common.js?v=20261026a"></script>
   <!-- ▌ 6. 本頁程式 -->
-  <script src="assets/js/pages/image-review.js?v=20261025a"></script>
+  <script src="assets/js/pages/image-review.js?v=20261026a"></script>
 
 </body></html>

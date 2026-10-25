@@ -13,7 +13,7 @@
 
   /** Demo 預設：分析日期固定為模擬資料日期 */
   var DEMO_DATE = '2025-08-07';
-  var DEFAULT_SORT = { key: 'time', asc: false };
+  var DEFAULT_SORT = { key: 'urgency', asc: false };   // 預設：時效由久到短（等最久的在最上面）
 
   var currentSpecimenId = null;   // 目前選取的檢體條碼（barcode）
   var filteredList = [];
@@ -195,10 +195,10 @@
     return selected.some(function (st) { return WR.matchesStatusFilter(s, st); });
   }
 
-  /** 排序：打勾／已完成者一律排最下方（第 4 節） */
+  /** 排序：全部完成的檢體排最下方；還有待辦的（即使部分膠囊已完成）依選擇的欄位排序（第 4 節） */
   function compareSpecimens(a, b) {
-    var ca = WR.showsCheckmark(a);
-    var cb = WR.showsCheckmark(b);
+    var ca = WR.isCompleted(a);
+    var cb = WR.isCompleted(b);
     if (ca !== cb) return ca ? 1 : -1;
     var cmp = 0;
     if (sortKey === 'id') {
