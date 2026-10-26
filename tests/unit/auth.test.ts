@@ -2,7 +2,8 @@
  * 登入／登出（infra/auth.ts）
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { login, logout, noteActivity, startIdleWatcher } from '../../src/infra/auth';
+import { bootstrap } from '../../src/pages/bootstrap';
+import { login, logout } from '../../src/infra/auth';
 import { reviewStorage, sessionInfo, toasts } from '../../src/infra/storage';
 
 beforeEach(() => {
@@ -44,16 +45,12 @@ describe('登出', () => {
   });
 });
 
-describe('閒置自動登出（文件 2 第 1.1 節）', () => {
-  it('30 分鐘內有操作就不登出；超過 30 分鐘沒有操作就自動登出', () => {
+describe('不做閒置自動登出（文件 2 第 1.1 節；2026-10-26 Eden 決定）', () => {
+  it('登入後頁面放著不動 2 小時，仍然保持登入', () => {
     sessionInfo.setToken('t');
-    startIdleWatcher();
-    vi.advanceTimersByTime(29 * 60_000);
-    noteActivity(); // 有操作（含內嵌報告頁轉告的操作）
-    vi.advanceTimersByTime(29 * 60_000);
+    expect(bootstrap()).not.toBeNull();
+    vi.advanceTimersByTime(2 * 60 * 60_000);
     expect(sessionInfo.token()).toBe('t');
-    vi.advanceTimersByTime(2 * 60_000);
-    expect(sessionInfo.token()).toBeNull();
   });
 });
 

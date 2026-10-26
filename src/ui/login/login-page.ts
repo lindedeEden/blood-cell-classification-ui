@@ -37,7 +37,7 @@ export function safeRedirect(search: string, base: string): string {
 
 export function initLoginPage(): void {
   if (new URLSearchParams(window.location.search).get('expired') === '1')
-    mustGet('idle-alert').classList.remove('hidden');
+    mustGet('session-expired-alert').classList.remove('hidden');
 
   const pwd = mustGet<HTMLInputElement>('password');
   const icon = mustGet('toggle-pwd-icon');

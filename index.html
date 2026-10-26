@@ -19,10 +19,10 @@
         <p class="text-slate-500 text-sm mt-1">請登入以使用檢體管理與閱片功能</p>
       </div>
 
-      <!-- 閒置逾時提示（由 ?expired=1 觸發） -->
-      <div id="idle-alert" class="hidden mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+      <!-- 登入失效提示（後端回覆登入已失效時由 ?expired=1 觸發） -->
+      <div id="session-expired-alert" class="hidden mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
         <span class="material-symbols-outlined text-base align-middle mr-1">timer_off</span>
-        閒置逾時，已自動登出。請重新登入。
+        登入已失效，請重新登入。
       </div>
 
       <form id="login-form" class="space-y-5" autocomplete="on" novalidate>

@@ -46,7 +46,7 @@
 |---|---|---|
 | `domain` | 型別：檢體、膠囊、流程狀態、門檻；**純函式規則 1～15** | — |
 | `data` | 四個來源模擬資料、AI 模型模擬（進線合併的規則在 domain） | domain |
-| `infra` | 瀏覽器儲存、模擬 API（登入、LIS 回寫）、登入與閒置登出 | domain |
+| `infra` | 瀏覽器儲存、模擬 API（登入、LIS 回寫）、登入與登出 | domain |
 | `app` | 應用動作：簽核、改人工鏡檢、標記完成、LIS 撤回、門檻設定（呼叫 domain 規則、寫入 infra） | domain、data、infra |
 | `ui` | 四個頁面、共用工具（跳脫、跳轉、字級） | app、infra、domain |
 | `demo` | 使用教學、情境模擬測試（可整包移除） | app、ui |

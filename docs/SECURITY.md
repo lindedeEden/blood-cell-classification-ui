@@ -13,7 +13,7 @@
 | 他頁偽造報告簽核訊息 | 只接受自己開的內嵌視窗（檢查 `event.source`）；以網址開啟時只送給同一網站 | 同左 |
 | 繞過畫面直接改狀態 | **原型做不到**：狀態存在瀏覽器 | **後端必須重新檢查每條規則**（鎖定、唯讀、可否簽核），前端的檢查只是使用者體驗 |
 | 共用電腦留下病人資料 | 登出時清除處理狀態、人員編輯結果、LIS 回寫紀錄；登入憑證存 sessionStorage（關閉分頁即清除） | 病人資料不存瀏覽器；登入憑證改用 HttpOnly Cookie |
-| 閒置未登出 | 每頁閒置 30 分鐘自動登出（報告視窗裡的操作也算） | 伺服器端的工作階段逾時 |
+| 閒置未登出 | 不做閒置自動登出（2026-10-26 Eden 決定：醫檢師離開電腦後被登出，反而造成現場困擾）；換人使用時由醫檢師自行登出 | 是否需要伺服器端工作階段逾時，依院內資安規範與現場需求決定 |
 | 套件弱點 | `npm audit`：0 項 | 定期掃描（CI） |
 
 ## 2. 已完成的項目
@@ -67,7 +67,7 @@ form-action 'self'; base-uri 'none'; object-src 'none'
 - [ ] `src/config.ts`：`ENV` 改為 `'production'`、`API_BASE_URL` 指向真實後端
 - [ ] 移除 `src/demo/` 與各頁的展示呼叫（`src/pages/*.ts` 標註「展示用」的行）
 - [ ] 後端重新實作並強制執行規則（可直接沿用 `src/domain/` 的純函式）：鎖定、唯讀、簽核條件、門檻修改權限（文件 2 附錄 A #2）
-- [ ] 登入改用 HttpOnly、Secure、SameSite Cookie；伺服器端工作階段逾時
+- [ ] 登入改用 HttpOnly、Secure、SameSite Cookie；伺服器端工作階段逾時是否需要，依院內規範決定（前端不做閒置自動登出）
 - [ ] 病人資料、處理狀態、人員編輯結果改存後端（文件 3「原型暫存」頁列出每個儲存鍵的去處）
 - [ ] 伺服器回應標頭：CSP（含 `frame-ancestors`）、`Strict-Transport-Security`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: same-origin`
 - [ ] 操作紀錄（誰在何時簽核、改為人工鏡檢、標記完成、修改門檻）

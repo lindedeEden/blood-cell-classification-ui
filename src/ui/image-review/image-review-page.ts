@@ -19,7 +19,6 @@ import {
   nextPendingSpecimen,
 } from '../../domain/rules/workflow';
 import type { Specimen } from '../../domain/types';
-import { noteActivity } from '../../infra/auth';
 import { toasts } from '../../infra/storage';
 import { byId, mustGet, setHtml } from '../shared/dom';
 import {
@@ -270,7 +269,6 @@ export function initImageReviewPage(ctx: AppContext, onReady?: () => void): void
   function onReportMessage(e: MessageEvent): void {
     if (e.source !== reportFrame.contentWindow) return;
     const msg = e.data as ReportMessage;
-    if (msg.type === 'reportActivity') return noteActivity();
     const id = msg.specimenId || spec!.barcode;
     if (msg.type === 'reportCancel') return hideReport();
     if (msg.type === 'reportManualAlert') {

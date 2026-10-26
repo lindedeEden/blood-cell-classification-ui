@@ -8,14 +8,12 @@ export const AppConfig = Object.freeze({
   API_BASE_URL: 'https://api.example-hematology.com/v1',
   API_TIMEOUT_MS: 15000,
 
-  /** 登入：Token 存 sessionStorage（分頁關閉即清除）；閒置 30 分鐘自動登出（文件 1） */
+  /** 登入：Token 存 sessionStorage（分頁關閉即清除）。不做閒置自動登出（2026-10-26 Eden 決定：會造成現場困擾） */
   AUTH: Object.freeze({
     TOKEN_KEY: 'bhm_session_token',
     USER_KEY: 'bhm_session_user',
     /** 登入帳號：全部完成時寫入編輯人員 */
     ACCOUNT_KEY: 'blood-morphology-user-account',
-    SESSION_TIMEOUT_MS: 30 * 60 * 1000,
-    IDLE_CHECK_INTERVAL_MS: 60 * 1000,
   }),
 
   /**

@@ -6,6 +6,4 @@ export type ReportMessage =
   | { type: 'reportVerified'; specimenId: string; navigateNext: boolean; confirmAiAlert: boolean; unlocked: boolean }
   | { type: 'reportManualAlert'; specimenId: string; addedFollowUp: boolean; lisSynced: boolean }
   | { type: 'reportFollowUpDone'; specimenId: string }
-  | { type: 'reportCancel'; specimenId?: string }
-  /** 使用者正在報告頁操作（閒置自動登出由外層頁面計時，內嵌視窗裡的操作外層收不到） */
-  | { type: 'reportActivity'; specimenId?: string };
+  | { type: 'reportCancel'; specimenId?: string };

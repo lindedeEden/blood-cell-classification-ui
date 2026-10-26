@@ -67,7 +67,7 @@ export async function runTour(page, base, shot) {
   await page.click('#login-btn');
   await shot('login-03-error-empty-account');
   await go('index.html', '?expired=1');
-  await shot('login-04-idle-expired');
+  await shot('login-04-session-expired');
   await page.fill('#account', 'admin');
   await page.fill('#password', 'admin');
   await Promise.all([page.waitForURL(/檢體管理|%E6%AA%A2/), page.click('#login-btn')]);

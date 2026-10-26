@@ -6,14 +6,13 @@ import { SpecimenStore } from '../app/specimen-store';
 import { ThresholdSettings } from '../app/thresholds';
 import { loadDatabase } from '../data/database';
 import { UsabilityStudy } from '../demo/usability-study';
-import { requireAuth, startIdleWatcher } from '../infra/auth';
+import { requireAuth } from '../infra/auth';
 import { lisLog } from '../infra/storage';
 import type { AppContext } from '../ui/context';
 
 /** 需要登入的頁面：未登入時導回登入頁並回傳 null */
 export function bootstrap(): AppContext | null {
   if (!requireAuth()) return null;
-  if (window.top === window) startIdleWatcher(); // 嵌在影像檢視頁裡的報告頁由外層負責
   const thresholds = new ThresholdSettings();
   const db = loadDatabase();
   const study = new UsabilityStudy(db, thresholds); // 必須在建立 SpecimenStore 之前

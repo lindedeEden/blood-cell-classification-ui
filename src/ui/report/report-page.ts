@@ -10,7 +10,7 @@ import { effectiveValues, leaveJudge, patientAge, riskState } from '../../domain
 import { signOffPlan } from '../../domain/rules/transitions';
 import { canSwitchToManualReview, needsPendingFollowUp, reportLockTarget } from '../../domain/rules/workflow';
 import type { LockTarget, RawValue, RiskState, Specimen } from '../../domain/types';
-import { ACTIVITY_EVENTS, currentUser } from '../../infra/auth';
+import { currentUser } from '../../infra/auth';
 import { byId, html, setHtml } from '../shared/dom';
 import { CHECK_ICON } from '../shared/icons';
 import { goToSpecimenList, specimenIdFromUrl } from '../shared/navigation';
@@ -271,18 +271,5 @@ export function initReportPage(ctx: AppContext): boolean {
   bind('verify-lock-btn', onToggleLock);
   bind('follow-up-done-btn', onFollowUpDone);
   bind('manual-alert-btn', (el) => void onManualReview(el));
-  forwardActivityToParent();
   return true;
-}
-
-/** 內嵌時：把使用者的操作轉告外層頁面（最多每 30 秒一次），避免在報告頁操作時被判定閒置而登出 */
-function forwardActivityToParent(): void {
-  let last = 0;
-  const onActivity = () => {
-    const now = Date.now();
-    if (now - last < 30_000) return;
-    last = now;
-    notifyParent({ type: 'reportActivity' });
-  };
-  for (const evt of ACTIVITY_EVENTS) document.addEventListener(evt, onActivity, { passive: true });
 }
